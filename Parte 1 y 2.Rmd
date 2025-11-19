@@ -1,0 +1,229 @@
+---
+title: "Taller 2: Explorando datos sobre migrantes venezolanos en Colombia"
+subtitle: "Facultad de Economía, Universidad de los Andes"
+author: "Camila Caraballo, Laura Rivera y Javier Amaya Nieto"
+date: "2025-09-15"
+output: html_document
+---
+
+# Setup del ambiente
+
+```{r, include=FALSE}
+# Instalando pacman si se requier
+if (!require("pacman")) install.packages("pacman")
+
+# Cargando los paquetes usando pacman
+pacman::p_load(
+  
+  # A) Manipulación, limpieza y visualización de datos
+  tidyverse,    # Colección de paquetes esenciales (incluye dplyr, ggplot2, etc.)
+  forcats,      # Herramientas para trabajar con variables categóricas (factores).
+  tibble,       # Implementación moderna de data.frames.
+  janitor,      # Limpieza de nombres de variables y tablas de frecuencia.
+  lubridate,    # Manejo avanzado de fechas y horas.
+  skimr,        # Resúmenes estadísticos completos y rápidos de data.frames.
+  stringi,      # Manipulación robusta de texto (strings).
+  scales,       # Formato de escalas en ggplot2 (ej. porcentajes, comas).
+  openxlsx,     # Guardar excel
+  writexl,      # Guardar excel
+
+  # B) Modelado y análisis estadístico/econométrico
+  fixest,       # Estimación de modelos de efectos fijos de alto rendimiento.
+  plm,          # Modelos econométricos para datos de panel.
+  AER,          # Herramientas para econometría aplicada (ej. variables instrumentales).
+  lmtest,       # Pruebas de hipótesis para modelos de regresión (ej. coeftest).
+  sandwich,     # Cálculo de errores estándar robustos a heterocedasticidad.
+  survey,       # Análisis de datos de encuestas complejas (ponderación, estratificación).
+
+  # C) Importación, exportación y generación de reportes
+  haven,        # Lectura y escritura de formatos de Stata, SAS y SPSS.
+  readxl,       # Lectura de archivos de Excel (.xls y .xlsx).
+  stargazer,    # Creación de tablas de regresión con formato de publicación.
+  knitr         # Generación de reportes dinámicos.
+)
+
+
+
+```
+
+# Parte 1: Planteamiento
+
+Formule una pregunta de interés de análisis. Estos son algunos ejemplos de preguntas iniciales, que deben ser transformadas a preguntas más específicas para realizar un análisis exploratorio de datos:
+
+• ¿Cómo varía el nivel de educación según la región en Colombia?
+
+• ¿Cuál es la relación entre la jefatura de hogar femenina y el acceso a servicios básicos?
+
+• ¿Qué factores están asociados al hacinamiento en los hogares colombianos?
+
+• ¿Existen disparidades de género en la participación laboral en diferentes regiones del país?
+
+• ¿Cuál es la tasa de acceso a servicios de salud según la condición laboral?
+
+• ¿Cómo varía la calidad de la vivienda según la zona urbana o rural?
+
+• ¿Qué factores están asociados a la informalidad laboral en Colombia?
+
+• ¿Se observan diferencias regionales en el acceso a internet según el nivel educativo del hogar?
+
+Junto con la pregunta, describa una situación o contexto en el cual la respuesta a ella pueda ser útil para tomar una decisión de inversión o de acción. Al final, el propósito de responder esta pregunta es proponer una acción sobre la población que está siendo identificada en alguna problemática social que se aborda en la pregunta. Por ejemplo, imagine que su grupo de trabajo hace parte de un equipo técnico que apoya la toma de una decisión basada en evidencia. En esta parte puede explicar cómo se analiza el tema de interés y sirve para definir las dimensiones de análisis en los datos (variables categóricas). De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos.
+
+De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos
+
+o Definición de la población
+
+o Unidad de observación:
+
+o Variables dependientes e independientes en el análisis
+
+o Dimensiones de análisis de interés: Esta definición es muy importante porque le permite identificar las variables que requiere utilizar en el proyecto.
+
+o Ámbito: Geografía/periodo de referencia o Latente: ¿Existe? Proxy propuesta (si aplica)
+
+o Relevancia: ¿Por qué esta pregunta es útil para tomar una decisión?
+
+### a) Ajustes iniciales
+
+-   Designando rutas de trabajo y carga de datos: en este paso se puede revisar rapidamente la base de hogares y se carga la base de personas debido a que se usarán algunas variable de esta última para construir unas variables de la base de hogares que será el foco de nuestro trabajo.
+
+```{r}
+# Rutas y datos iniciales
+xlsx_path <- "data/2025 JNA VP.xlsx"
+hogares <- read_excel(xlsx_path, sheet = "Hogares") %>% clean_names()
+personas <- read_excel(xlsx_path, sheet = "Personas") %>% clean_names()
+
+#str(hogares) # Ver base
+#colSums(is.na(hogares)) # Revisar NA de la base
+#sum(duplicated(hogares$id_hogar))   # verificar hogares duplicados
+```
+
+-   Estandarizar nombres (mayúsculas/acentos) en intro4 e intro5: en este paso ajustamos los nombres de departamento y municipio para mejorar la presentación de los datos de aquí en adelante. Y también se hace un proceso de estandarización usando clean:names() de janitor.
+
+```{r}
+# Cambiar nombres y estandarizar
+data_hogares <- hogares %>%
+   rename(
+    DPNOM = intro4,  # Departamento
+    MPIO  = intro5   # Municipio
+  ) %>%
+  mutate(
+    DPNOM = DPNOM %>%
+      str_to_lower() %>%
+      str_trim() %>%
+      stri_trans_general("Latin-ASCII") %>%
+      str_to_title(),
+    
+    MPIO = MPIO %>%
+      str_to_lower() %>%
+      str_trim() %>%
+      stri_trans_general("Latin-ASCII") %>%
+      str_to_title()
+  ) %>% 
+  clean_names()
+
+```
+
+### b) Situación o contexto 
+
+Considerando los requisitos del taller y la pregunta de indagación consignada en la sección *Parte 1.a*, que propone comparar las carencias en el acceso a servicios públicos entre hogares migrantes según su nivel de vulnerabilidad, esta sección explica la lógica utilizada para seleccionar una ciudad específica.
+
+En el marco de un programa de mejora de la calidad de vida de hogares venezolanos —en el que nuestro equipo debe apoyar a la alcaldía de una de estos municipios— se decidió identificar la ciudad con la menor tasa de intención de migración a seis meses. Se parte de la premisa de que una población con baja movilidad ofrece un entorno más estable y predecible, lo que representa una ventaja estratégica para diseñar e implementar políticas públicas de largo plazo que fortalezcan la respuesta local en vivienda y servicios básicos.
+
+Asimismo, se detalla el proceso de depuración de datos que permitió construir la variable de intención de movimiento y migración (**int_mov2**). Para ello, se recodificó la variable categórica *demo22* (intención de migración de alguno de los miembros del hogar en los siguientes seis meses) en una nueva variable binaria, **int_mov2**. Se asignó el valor **1** a las respuestas que indicaban planes de migración —ya fuera dentro de Colombia (cambio de municipio o departamento) o fuera del país— y el valor **0** a aquellas sin intención de desplazamiento.
+
+```{r}
+
+# convirtiendo texto categórico a factor
+data_hogares <- data_hogares %>% mutate(across(where(is.character), as.factor))
+
+# Creando la variable de intención de movimiento de ciudad
+data_hogares <- data_hogares %>%
+  mutate(
+      int_mov2 = case_when(
+      # Condiciones por las que se responde Sí=1
+      str_detect(demo22, regex("^No sabe", ignore_case = TRUE)) ~ 1L,
+      str_detect(demo22, regex("^Sí, irnos a otro país (diferente a Venezuela)", ignore_case = TRUE)) ~ 1L,
+      str_detect(demo22, regex("^Sí, irnos a Venezuela", ignore_case = TRUE)) ~ 1L,
+      str_detect(demo22, regex("^Sí, nos vamos a cambiar a otro departamento al interior de Colombia", ignore_case = TRUE)) ~ 1L,
+      str_detect(demo22, regex("^Sí, nos vamos a cambiar de municipio pero en el mismo departamento actual", ignore_case = TRUE)) ~ 1L,
+
+      # Condición de lo contrario 
+      TRUE ~ 0L
+    )
+  )
+```
+
+### c) Definición de la población y unidad de observación
+
+### d) Variables dependientes e independientes en el análisis
+
+### Pregunta de indagación
+
+Teniendo en cuenta los resultados presentados en la **PARTE 0\* Este trabajo busca responder la siguiente pregunta de investigación:\
+**¿Existen diferencias en las carencias de acceso a servicios públicos entre hogares migrantes con distintos niveles de vulnerabilidad en Cartagena de Indias?\*\*
+
+Considerando la pregunta de investigación planteada, en esta sección se presentan los **análisis univariados** que permiten explorar con mayor detalle las variables centrales del estudio:
+
+-   **Variable dependiente (Y):** *Carencia de acceso a servicios públicos*, que sintetiza las condiciones de vivienda en términos de energía electríca, gas, agua, acueducto y alcantarillado, y disposición de residuos.
+-   **Variable independiente (X):** *Score de vulnerabilidad*, construido a partir de cuatro condiciones clave de vulnerabilidad que se describirán por separado para facilitar su comprensión.
+
+El objetivo de este apartado es caracterizar de manera individual estas variables, identificando su distribución y principales patrones, como paso previo al análisis bivariado que permitirá evaluar la relación entre ellas.
+
+### Variable dependiente
+
+Se construye la variable *servicios* que mide la cantidad de servicios básicos de los que carece la vivienda y se construye a partir de las variables (electricidad, gas, alcantallirado, acueducto y recolección de basuras). Por cada servicio que hace falta en el hogar se cuenta como 1 y si carece de todos entonces cuenta como 5
+
+### Variables independientes
+
+Para intentar análizar de forma diferencial las diferencias en las carencias de acceso a servicios públicos (variable dependiente), se construyó un **índice de vulnerabilidad** a nivel de hogar que sintetiza cuatro condiciones estructurales asociadas a un mayor riesgo social. Estas condiciones, consideradas de manera individual y en conjunto, permiten caracterizar la situación de vulnerabilidad de los hogares migrantes en Cartagena de Indias. Las variables consideradas son:
+
+1.  **Jefatura femenina del hogar**: identifica si la persona cabeza de hogar es mujer.
+2.  **Hogar monoparental**: determina si el hogar está conformado por un padre o madre sin cónyuge y con hijos, o si incluye un “Papá/Mamá” con estado civil soltero, separado, divorciado o viudo.
+3.  **Presencia de personas con discapacidad**: señala si al menos un miembro del hogar reporta alguna limitación o barrera física.
+4.  **Antecedentes de violencia o amenazas**: registra si algún miembro del hogar ha sido víctima de violencia o amenazas.
+
+### e) Dimensiones de análisis de interés 
+
+### f) Ámbito y latente 
+
+### g) Relevancia 
+
+Esta sección presenta, como eje central, los municipios con menor intención de movilidad, complementados con aquellos de mayor intención y las principales razones de desplazamiento, buscando asegurar la coherencia de los hallazgos.
+
+# Parte 2: EDA y modelamiento de datos
+
+### 2.1) Preparación y comprensión inicial de los datos
+
+Antes de producir cualquier gráfico o métrica comparativa, deténgase a estudiar la forma, codificación y calidad de sus datos. Un buen análisis comienza por saber exactamente qué representa cada variable y cómo fue registrada. En el código reproducible debe observarse:
+
+• Carga de los datos y verificación de estructuras básicas (número de observaciones, número de variables, tipos de variables).
+
+• Revisión de codificación:
+
+o ¿Sus variables numéricas son realmente numéricas?
+
+o ¿Las categorías están completas y correctamente etiquetadas?
+
+o ¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?
+
+o ¿Cómo se comporta el factor de expansión? (si aplica)
+
+• Tratamiento de faltantes donde se registre cómo se manejan NA y categorías especiales.
+
+• Identificación de valores atípicos o valores imposibles
+
+• Recodificaciones necesarias, como reagrupar categorías raras, crear bandas, construir conteos de carencias o generar proxies. Todo ajuste debe quedar documentado mediante comentarios o un resumen breve dentro del informe a modo de notas de método
+
+### 2.2) Análisis univariado sistemático
+
+Antes de cruzar variables debe producir una comprensión clara de cada variable crítica teniendo en cuenta su distribución, categorías relevantes, patrones básicos se observan, cómo se comporta según el factor de expansión (si aplica)
+
+Para cada variable relevante incluya:
+
+• Tablas de frecuencia o estadísticas descriptivas, según su tipo.
+
+• Uno o dos gráficos univariados pertinentes como histogramas, gráficos de barras, boxplots simples, diagramas de densidad. Este análisis sirve como la base conceptual del proyecto: sin esta revisión, cualquier cruce posterior puede ser engañoso o incorrecto.
+
+### 2.3) Análisis bivariado guiado por la pregunta
+
+Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
