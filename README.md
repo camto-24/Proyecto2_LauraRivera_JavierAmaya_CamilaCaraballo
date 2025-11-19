@@ -1,2 +1,3 @@
-# Proyecto2 
+# Proyecto 2: Visualización y construcción de historias con datos
+
 Este proyecto busca consolidar los aprendizajes de todo el curso, integrando el análisis exploratorio de datos, la modelación de datos y la comunicación visual. A partir de una pregunta de índole social, vamos a construir un proceso completo que incluya la búsqueda y depuración de datos, el desarrollo de un análisis exploratorio (EDA) con evidencia descriptiva, la creación de un modelo de datos y el diseño de una visualización interactiva que, además de contribuir con la exploración de los datos tanto propia como de la audiencia, permita apoyar la comunicación de los hallazgos de manera clara y argumentada.
