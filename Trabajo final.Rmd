@@ -46,36 +46,109 @@ pacman::p_load(
 
 # Parte 1: Pregunta de interés
 
-Existe una asociación positiva entre la frecuencia de consumo de bebidas azucaradas (X) y la prevalencia de diagnóstico de enfermedades crónicas (Y).
+o **Pregunta de interés**: ¿Existe una asociación positiva entre el consumo de bebidas azucaradas y la probabilidad de presentar un diagnóstico de enfermedad crónica en los últimos 12 meses?
 
-la variable se llama P1930
+o **Definición de la población**: Son los individuos residentes de los diferentes municipios y departamentos de Colombia a los que fueron encuestados en la base de salud del Departamento Administrativo Nacional de Estadística (DANE) en el año 2023.
 
+o **Unidad de observación**: Cada observación de la base de salud corresponde a los individuos
 
-En esta parte puede explicar cómo se analiza el tema de interés y sirve para definir las dimensiones de análisis en los datos (variables categóricas). De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos.
+o **Variable dependiente**:
 
-De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos
+**Base 1: Salud**
 
-o Definición de la población
+-   Variable: Diagnóstico de enfermedad crónica (P1930)
 
-o Unidad de observación:
+    Pregunta: “En los últimos 12 meses, ¿a usted le han diagnosticado alguna enfermedad crónica?”
 
-o Variables dependientes e independientes en el análisis
+    Categorías: 1 = Sí / 2 = No
 
-o Dimensiones de análisis de interés: Esta definición es muy importante porque le permite identificar las variables que requiere utilizar en el proyecto.
+    Tipo: Variable discreta numérica
 
-o Ámbito: Geografía/periodo de referencia o Latente: ¿Existe? Proxy propuesta (si aplica)
+o **Variable independiente**:
 
-o Relevancia: ¿Por qué esta pregunta es útil para tomar una decisión?
+-   Variable: Consumo de bebidas azucaradas (P1707)
+
+    Pregunta: “¿Consume bebidas azucaradas?”
+
+    Categorías: 1 = Sí / 2 = No
+
+    Tipo: Variable discreta numérica
+
+-   Variable: Frecuencia de consumo de bebidas azucaradas (P1707S1)
+
+    Pregunta: “Con que frecuencia consume las bebidas azucaradas:
+
+    Categorías: 1 Todos los días de la semana (dos o más veces al día) 2 Todos los días de la semana (una vez al día) 3 Cuatro a seis veces a la semana 4 Dos o tres veces a la semana 5 Una vez a la semana 6 Menos de una vez por semana
+
+    Tipo: Variable discreta numérica
+
+o **Dimensiones de análisis de interés**: Las variables control que requiere utilizar en el proyecto son:
+
+**Base 2: Características y Composición del Hogar**
+
+-   Variable: Sexo (P6020)
+
+    Pregunta: “¿Cuál es el sexo de la persona?”
+
+    Categorías: 1= Hombre / 2= Mujer
+
+    Tipo: Variable discreta numérica
+
+    Justificación: El riesgo de desarrollar enfermedades crónicas y los patrones de consumo de bebidas azucaradas suelen diferir entre hombres y mujeres. Incluir esta variable permite controlar por diferencias biológicas y de comportamiento alimentario, efectos heterogéneos.
+
+-   Variable: Edad (P6040)
+
+    Pregunta: “¿Cuántos años cumplidos tiene?”
+
+    Tipo: Variable discreta numérica
+
+    Justificación: La edad es el principal factor de riesgo para la aparición de enfermedades crónicas. Además, los hábitos alimenticios tienden a variar a lo largo del ciclo de vida. Por su importancia epidemiológica, debe ser controlada en el análisis.
+
+-   Variable: Parentesto (P6051)
+
+    Pregunta:“¿Cuál es el parentesco de la persona con el jefe/a de hogar?”
+
+    Categorías: 1. Jefe/a del hogar 2. Pareja, esposo/a, cónyuge, compañero/a 3. Hijo/a, hijastro/a 4. Nieto/a 5. Padre, madre, padrastro, madrastra 6. Suegro o suegra 7. Hermano/a, hemanastro/a 8. Yerno, nuera 9. Otro/a pariente del/de la jefe/a 10. Empleado/a del servicio doméstico 11. Parientes del servicio doméstico 12. Trabajador/a 13. Pensionista 14. Otro(a) no pariente
+
+    Tipo: Variable discreta numérica
+
+    Justificación: Permite caracterizar la estructura del hogar y, si se realizan análisis agregados por hogar, identificar roles que influyen en las decisiones alimentarias o responsabilidades en la compra y preparación de alimentos.
+
+**Base 3: Educación**
+
+-   Variable: Nivel educativo más alto alcanzado (P8587)
+
+    Pregunta:“¿Cuál es el nivel educativo más alto que ha alcanzado?”
+
+    Categorías: 1Ninguno 2 Preescolar 3 Básica Primaria (1º - 5º) 4 Básica secundaria (6º--9º) 5 Media (10º -13º) 6 Técnico sin título 7 Técnico con título 8 Tecnológico sin título 9 Tecnológico con título 10 Universitario sin titulo 11 Universitario con titulo 12 Postgrado sin titulo 13 Postgrado con titulo
+
+    Tipo: Variable discreta numérica
+
+    Justificación: El nivel educativo influye en el conocimiento sobre nutrición, el entendimiento de riesgos asociados al consumo de azúcar y la capacidad para adoptar comportamientos saludables.
+
+**Base 4: Servicios del Hogar**
+
+-   Variable: ingreso per capita del hogar (PERCAPITA)
+
+    Descripción:Monto total de ingresos del hogar dividido entre el número de integrantes.
+
+    Tipo: Variable discreta numérica
+
+    Justificación:Refleja la capacidad adquisitiva individual. Determina el tipo y cantidad de alimentos consumidos, incluidos productos ultraprocesados como bebidas azucaradas.
+
+o **Ámbito: Geografía/periodo de referencia o Latente**: ¿Existe? Proxy propuesta (si aplica)
+
+o **Relevancia**: La pregunta de interés de este trabajo es relevante porque permite identificar si el consumo de bebidas azucaradas está asociado con una mayor prevalencia de enfermedades crónicas, lo cual tiene implicaciones directas para la toma de decisiones en salud pública. Comprender esta relación es útil para tomar decisiones de políticas públicas enfocadas a mejorar la externalidad negativa en el consumo de estos productos por medio de impuestos, capacitaciones de salud, regulaciones a los productos con altos porcentajes de azúcar, entre otros.
+
+Además, al contar con información territorial por departamento y municipio, es posible focalizar acciones en las zonas donde se observe mayor riesgo, optimizando recursos y fortaleciendo la planeación sanitaria. Finalmente, esta evidencia contribuye al diseño de estrategias efectivas que busquen reducir la carga de enfermedades crónicas en la población y mejorar su bienestar.
 
 # Parte 2: EDA y modelamiento de datos
 
-•	USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER: https://r-charts.com/es/paletas-colores/
+• USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER: <https://r-charts.com/es/paletas-colores/>
 
-•	USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: https://r-charts.com/es/ggplot2/temas/
+• USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: <https://r-charts.com/es/ggplot2/temas/>
 
 ### 2.1) Preparación y comprensión inicial de los datos
-
-Antes de producir cualquier gráfico o métrica comparativa, deténgase a estudiar la forma, codificación y calidad de sus datos. Un buen análisis comienza por saber exactamente qué representa cada variable y cómo fue registrada. En el código reproducible debe observarse:
 
 • Carga de los datos y verificación de estructuras básicas (número de observaciones, número de variables, tipos de variables).
 
@@ -96,19 +169,138 @@ o ¿Cómo se comporta el factor de expansión? (si aplica)
 • Recodificaciones necesarias, como reagrupar categorías raras, crear bandas, construir conteos de carencias o generar proxies. Todo ajuste debe quedar documentado mediante comentarios o un resumen breve dentro del informe a modo de notas de método
 
 ```{r}
-# 1. Rutas y datos iniciales
-ruta <- "C:\\1. MECA\\2025\\EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón\\Datos_proyecto2\\Salud.dta"
-salud <- read_dta(ruta)
+#//////// Rutas y datos iniciales de las 4 bases
+ruta <- "C:/1. MECA/2025/EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón/Datos_proyecto2"
+
+# Base 1: Salud
+salud <- read_dta(file.path(ruta, "Salud.dta"))
+
+# Base 2: Características y composición del hogar
+caracteristicas <- read_dta(file.path(ruta, "Características y composición del hogar.dta"))
+
+# Base 3: Educación
+educacion <- read_dta(file.path(ruta, "Educación.dta"))
+
+# Base 4: Servicios del hogar
+servicios <- read_dta(file.path(ruta, "Servicios del hogar.dta"))
+
+# Base 5: Datos de la vivienda
+vivienda <- read_dta(file.path(ruta, "Datos de la vivienda.dta"))
+
+# Revisión de las bases
+#str(salud)        # tipo de variables
+```
+
+```{r}
+#//////// Mantener solo las variables de interés 
+
+# 1. Base de Salud (Nivel Persona)
+df_salud <- salud %>%
+  select(DIRECTORIO, SECUENCIA_P, ORDEN,
+         P1707,       # Consumo bebidas azucaradas
+         P1707S1,     # Frecuencia consumo
+         P1930)       # Diagnóstico enfermedad crónica
+
+# 2. Base de Características del Hogar (Nivel Persona)
+df_caracteristicas <- caracteristicas %>%
+  select(DIRECTORIO, SECUENCIA_P, ORDEN,
+         P6020,       # Sexo
+         P6040,       # Edad
+         P6051)       # Jefe del hogar
+
+# 3. Base de Educación (Nivel Persona)
+df_educacion <- educacion %>%
+  select(DIRECTORIO, SECUENCIA_P, ORDEN,
+         P8587)       # Variable ejemplo
+
+# 4. Base de Servicios del Hogar (Nivel Hogar)
+df_servicios <- servicios %>%
+  select(DIRECTORIO,
+         SECUENCIA_P,
+         ORDEN,
+         PERCAPITA,   # Ingreso per cápita
+         FEX_C)       # Factor de expansión (ajusta si tu variable tiene otro nombre)
+
+# 5. Base de Datos de la Vivienda (Nivel Vivienda)
+df_vivienda <- vivienda %>%
+  select(DIRECTORIO,
+         SECUENCIA_P,
+         P1_DEPARTAMENTO,
+         ORDEN,
+         P1_MUNICIPIO)
+
+```
+
+```{r}
+#//////// Se verifican los duplicados
+
+# 1. SALUD
+n_dupli_salud <- df_salud %>% 
+  group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
+  filter(n() > 1) %>% 
+  nrow()
+print(paste("Duplicados en Salud:", n_dupli_salud))
+
+# 2. CARACTERÍSTICAS
+n_dupli_caract <- df_caracteristicas %>% 
+  group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
+  filter(n() > 1) %>% 
+  nrow()
+print(paste("Duplicados en Características:", n_dupli_caract))
+
+# 3. EDUCACIÓN
+n_dupli_educ <- df_educacion %>% 
+  group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
+  filter(n() > 1) %>% 
+  nrow()
+print(paste("Duplicados en Educación:", n_dupli_educ))
+
+# 4. SERVICIOS DEL HOGAR
+n_dupli_servicios <- df_servicios %>%
+  group_by(DIRECTORIO, SECUENCIA_P) %>%
+  filter(n() > 1) %>%
+  nrow()
+print(paste("Duplicados en Servicios:", n_dupli_servicios))
+
+# Corrección eliminando duplicados
+df_servicios <- df_servicios %>%
+  group_by(DIRECTORIO, SECUENCIA_P) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+# Verificar de nuevo
+n_dupli_servicios_post <- df_servicios %>%
+  group_by(DIRECTORIO, SECUENCIA_P) %>%
+  filter(n() > 1) %>%
+  nrow()
+
+print(paste("Duplicados en Servicios después de corregir:", n_dupli_servicios_post))
+
+# 5. VIVIENDA
+n_dupli_vivienda <- df_vivienda %>% 
+  group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
+  filter(n() > 1) %>% 
+  nrow()
+print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
+
+```
+
+```{r}
+#//////// Se unen las 5 bases ya con las variables seleccionadas
+df_final <- df_salud %>%
+  left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
+  left_join(df_educacion,       by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
+  left_join(df_servicios,       by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
+  left_join(df_vivienda,        by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN"))
+
+# Verificación final de dimensiones
+dim(df_final)
+
+```
 
 
-# 2. Revisión de la base
-dim(salud)        # número de filas y columnas
-str(salud)        # tipo de variables
-skim(salud)       # resumen completo (opcional)
-colSums(is.na(salud)) # Revisar NA de la base
-#sum(duplicated(hogares$id_hogar))   # verificar hogares duplicados
-
-# 3. Limpieza de datos 
+```{r}
+#///// Limpieza de datos 
 # Se convierten en 0 las variables económicas
 salud <- salud %>% 
   mutate(
@@ -174,5 +366,6 @@ Para cada variable relevante incluya:
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
 
-# Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados 
+# Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados
+
 Revisión de Power BI
