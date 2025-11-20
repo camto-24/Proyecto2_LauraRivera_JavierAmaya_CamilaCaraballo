@@ -44,25 +44,11 @@ pacman::p_load(
 )
 ```
 
-# Parte 1: Planteamiento
+# Parte 1: Pregunta de interés
 
-Formule una pregunta de interés de análisis. 
+Existe una asociación positiva entre la frecuencia de consumo de bebidas azucaradas (X) y la prevalencia de diagnóstico de enfermedades crónicas (Y).
 
-Propuesta 2: ¿Los hogares con alto consumo de bebidas azucaradas y tabaco incurren en mayores gastos médicos de bolsillo (medicamentos/consultas) que los hogares con hábitos saludables?
-
-Variables Clave:
-- Hábitos (Riesgo): P3008 (Fuma cigarrillo/vapeador), P1707 (Consume bebidas azucaradas), P3003 (Consume alimentos de paquete/chatarra).
-- Consecuencias (Gasto): P3182 (Gasto en medicamentos), P3178S2A1 (Valor consulta médico particular), P3183S1 (Valor exámenes de laboratorio).
-- Control: P8556 (Fuente para cubrir costos: Recursos propios vs. EPS).
-Hipótesis: El consumo de ultraprocesados (P3003) correlaciona positivamente con mayores gastos en medicamentos (P3182) incluso controlando por edad.
-
-Propuesta 3: ¿Existe una correlación inversa entre el nivel socioeconómico y la frecuencia de consumo de bienes gravados (bebidas azucaradas/alimentos ultraprocesados)?
-
-Variables de Consumo:
-- P1707 y P1707S1: Consumo y frecuencia de bebidas azucaradas.
-- P3003: Consumo de alimentos de paquete.
-- Nivel socieconomico y de educación 
-Objetivo: Determinar si el consumo de estos bienes es un "bien inferior" (se consume más cuando se es más pobre) y estimar la carga potencial del impuesto en los quintiles más bajos.
+la variable se llama P1930
 
 
 En esta parte puede explicar cómo se analiza el tema de interés y sirve para definir las dimensiones de análisis en los datos (variables categóricas). De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos.
@@ -111,8 +97,9 @@ o ¿Cómo se comporta el factor de expansión? (si aplica)
 
 ```{r}
 # 1. Rutas y datos iniciales
-ruta <- "data/Salud.dta"
+ruta <- "C:\\1. MECA\\2025\\EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón\\Datos_proyecto2\\Salud.dta"
 salud <- read_dta(ruta)
+
 
 # 2. Revisión de la base
 dim(salud)        # número de filas y columnas
