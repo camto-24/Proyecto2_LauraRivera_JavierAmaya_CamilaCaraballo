@@ -83,6 +83,10 @@ o Relevancia: ¿Por qué esta pregunta es útil para tomar una decisión?
 
 # Parte 2: EDA y modelamiento de datos
 
+•	USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER: https://r-charts.com/es/paletas-colores/
+
+•	USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: https://r-charts.com/es/ggplot2/temas/
+
 ### 2.1) Preparación y comprensión inicial de los datos
 
 Antes de producir cualquier gráfico o métrica comparativa, deténgase a estudiar la forma, codificación y calidad de sus datos. Un buen análisis comienza por saber exactamente qué representa cada variable y cómo fue registrada. En el código reproducible debe observarse:
@@ -107,7 +111,7 @@ o ¿Cómo se comporta el factor de expansión? (si aplica)
 
 ```{r}
 # 1. Rutas y datos iniciales
-ruta <- "Datos/Salud.dta"
+ruta <- "data/Salud.dta"
 salud <- read_dta(ruta)
 
 # 2. Revisión de la base

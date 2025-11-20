@@ -1,0 +1,12 @@
+# Apple
+.DS_Store
+
+.stswp
+~extendedfigure1 [Recovered].do.stswp
+
+scripts/.DS_Store
+scripts/.stswp
+
+# archivos de datos
+*.csv
+*.dta
