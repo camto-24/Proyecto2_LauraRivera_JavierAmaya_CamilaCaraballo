@@ -1,0 +1,187 @@
+---
+title: "Proyecto 2 - Visualización y construcción de historias con datos "
+subtitle: "Facultad de Economía, Universidad de los Andes"
+author: "Camila Caraballo, Laura Rivera y Javier Amaya Nieto"
+date: "2025-11-15"
+output: html_document
+---
+
+# Setup del ambiente
+
+```{r, include=FALSE}
+# Instalando pacman si se requier
+if (!require("pacman")) install.packages("pacman")
+
+# Cargando los paquetes usando pacman
+pacman::p_load(
+  
+  # A) Manipulación, limpieza y visualización de datos
+  tidyverse,    # Colección de paquetes esenciales (incluye dplyr, ggplot2, etc.)
+  forcats,      # Herramientas para trabajar con variables categóricas (factores).
+  tibble,       # Implementación moderna de data.frames.
+  janitor,      # Limpieza de nombres de variables y tablas de frecuencia.
+  lubridate,    # Manejo avanzado de fechas y horas.
+  skimr,        # Resúmenes estadísticos completos y rápidos de data.frames.
+  stringi,      # Manipulación robusta de texto (strings).
+  scales,       # Formato de escalas en ggplot2 (ej. porcentajes, comas).
+  openxlsx,     # Guardar excel
+  writexl,      # Guardar excel
+  haven,
+
+  # B) Modelado y análisis estadístico/econométrico
+  fixest,       # Estimación de modelos de efectos fijos de alto rendimiento.
+  plm,          # Modelos econométricos para datos de panel.
+  AER,          # Herramientas para econometría aplicada (ej. variables instrumentales).
+  lmtest,       # Pruebas de hipótesis para modelos de regresión (ej. coeftest).
+  sandwich,     # Cálculo de errores estándar robustos a heterocedasticidad.
+  survey,       # Análisis de datos de encuestas complejas (ponderación, estratificación).
+
+  # C) Importación, exportación y generación de reportes
+  haven,        # Lectura y escritura de formatos de Stata, SAS y SPSS.
+  readxl,       # Lectura de archivos de Excel (.xls y .xlsx).
+  stargazer,    # Creación de tablas de regresión con formato de publicación.
+  knitr         # Generación de reportes dinámicos.
+)
+```
+
+# Parte 1: Planteamiento
+
+Formule una pregunta de interés de análisis. 
+
+Propuesta 2: ¿Los hogares con alto consumo de bebidas azucaradas y tabaco incurren en mayores gastos médicos de bolsillo (medicamentos/consultas) que los hogares con hábitos saludables?
+
+Variables Clave:
+- Hábitos (Riesgo): P3008 (Fuma cigarrillo/vapeador), P1707 (Consume bebidas azucaradas), P3003 (Consume alimentos de paquete/chatarra).
+- Consecuencias (Gasto): P3182 (Gasto en medicamentos), P3178S2A1 (Valor consulta médico particular), P3183S1 (Valor exámenes de laboratorio).
+- Control: P8556 (Fuente para cubrir costos: Recursos propios vs. EPS).
+Hipótesis: El consumo de ultraprocesados (P3003) correlaciona positivamente con mayores gastos en medicamentos (P3182) incluso controlando por edad.
+
+Propuesta 3: ¿Existe una correlación inversa entre el nivel socioeconómico y la frecuencia de consumo de bienes gravados (bebidas azucaradas/alimentos ultraprocesados)?
+
+Variables de Consumo:
+- P1707 y P1707S1: Consumo y frecuencia de bebidas azucaradas.
+- P3003: Consumo de alimentos de paquete.
+- Nivel socieconomico y de educación 
+Objetivo: Determinar si el consumo de estos bienes es un "bien inferior" (se consume más cuando se es más pobre) y estimar la carga potencial del impuesto en los quintiles más bajos.
+
+
+En esta parte puede explicar cómo se analiza el tema de interés y sirve para definir las dimensiones de análisis en los datos (variables categóricas). De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos.
+
+De manera similar a la Parte 1 de la Actividad 2, defina la variable de medición (Y, dependiente- hecho) y la variable independiente (X, factor explicativo o dimensión principal). Con esta definición de variables, en el informe haga un contexto más específico de la situación, una descripción de la pregunta de indagación teniendo en cuenta los siguientes aspectos
+
+o Definición de la población
+
+o Unidad de observación:
+
+o Variables dependientes e independientes en el análisis
+
+o Dimensiones de análisis de interés: Esta definición es muy importante porque le permite identificar las variables que requiere utilizar en el proyecto.
+
+o Ámbito: Geografía/periodo de referencia o Latente: ¿Existe? Proxy propuesta (si aplica)
+
+o Relevancia: ¿Por qué esta pregunta es útil para tomar una decisión?
+
+# Parte 2: EDA y modelamiento de datos
+
+### 2.1) Preparación y comprensión inicial de los datos
+
+Antes de producir cualquier gráfico o métrica comparativa, deténgase a estudiar la forma, codificación y calidad de sus datos. Un buen análisis comienza por saber exactamente qué representa cada variable y cómo fue registrada. En el código reproducible debe observarse:
+
+• Carga de los datos y verificación de estructuras básicas (número de observaciones, número de variables, tipos de variables).
+
+• Revisión de codificación:
+
+o ¿Sus variables numéricas son realmente numéricas?
+
+o ¿Las categorías están completas y correctamente etiquetadas?
+
+o ¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?
+
+o ¿Cómo se comporta el factor de expansión? (si aplica)
+
+• Tratamiento de faltantes donde se registre cómo se manejan NA y categorías especiales.
+
+• Identificación de valores atípicos o valores imposibles
+
+• Recodificaciones necesarias, como reagrupar categorías raras, crear bandas, construir conteos de carencias o generar proxies. Todo ajuste debe quedar documentado mediante comentarios o un resumen breve dentro del informe a modo de notas de método
+
+```{r}
+# 1. Rutas y datos iniciales
+ruta <- "Datos/Salud.dta"
+salud <- read_dta(ruta)
+
+# 2. Revisión de la base
+dim(salud)        # número de filas y columnas
+str(salud)        # tipo de variables
+skim(salud)       # resumen completo (opcional)
+colSums(is.na(salud)) # Revisar NA de la base
+#sum(duplicated(hogares$id_hogar))   # verificar hogares duplicados
+
+# 3. Limpieza de datos 
+# Se convierten en 0 las variables económicas
+salud <- salud %>% 
+  mutate(
+    gasto_medic = ifelse(is.na(P3182), 0, P3182),
+    gasto_consulta = ifelse(is.na(P3178S2A1), 0, P3178S2A1),
+    gasto_lab = ifelse(is.na(P3183S1), 0, P3183S1)
+  )
+
+salud <- salud %>%
+  mutate(
+    fuma = ifelse(P3008 == 1, 1, 0),  # Fuma o no
+    bebe_azu = ifelse(P1707 == 1, 1, 0),
+    ultraprocesados = ifelse(P3003 == 1, 1, 0)
+  )
+
+# Se revisan datos outliers 
+boxplot(salud$gasto_medic)
+boxplot(salud$gasto_consulta)
+boxplot(salud$gasto_lab)
+
+# Percentiles
+quantile(salud$gasto_medic, probs=c(.90,.95,.99,.999))
+
+```
+
+-   Estandarizar nombres (mayúsculas/acentos) en intro4 e intro5: en este paso ajustamos los nombres de departamento y municipio para mejorar la presentación de los datos de aquí en adelante. Y también se hace un proceso de estandarización usando clean:names() de janitor.
+
+```{r}
+# Cambiar nombres y estandarizar
+data_hogares <- hogares %>%
+   rename(
+    DPNOM = intro4,  # Departamento
+    MPIO  = intro5   # Municipio
+  ) %>%
+  mutate(
+    DPNOM = DPNOM %>%
+      str_to_lower() %>%
+      str_trim() %>%
+      stri_trans_general("Latin-ASCII") %>%
+      str_to_title(),
+    
+    MPIO = MPIO %>%
+      str_to_lower() %>%
+      str_trim() %>%
+      stri_trans_general("Latin-ASCII") %>%
+      str_to_title()
+  ) %>% 
+  clean_names()
+
+```
+
+### 2.2) Análisis univariado sistemático
+
+Antes de cruzar variables debe producir una comprensión clara de cada variable crítica teniendo en cuenta su distribución, categorías relevantes, patrones básicos se observan, cómo se comporta según el factor de expansión (si aplica)
+
+Para cada variable relevante incluya:
+
+• Tablas de frecuencia o estadísticas descriptivas, según su tipo.
+
+• Uno o dos gráficos univariados pertinentes como histogramas, gráficos de barras, boxplots simples, diagramas de densidad. Este análisis sirve como la base conceptual del proyecto: sin esta revisión, cualquier cruce posterior puede ser engañoso o incorrecto.
+
+### 2.3) Análisis bivariado guiado por la pregunta
+
+Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
+
+# Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados 
+Revisión de Power BI
