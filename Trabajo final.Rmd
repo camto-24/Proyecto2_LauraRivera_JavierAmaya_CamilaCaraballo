@@ -144,7 +144,13 @@ Además, al contar con información territorial por departamento y municipio, es
 
 # Parte 2: EDA y modelamiento de datos
 
-• USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER: <https://r-charts.com/es/paletas-colores/>
+• USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER:
+
+-   <https://r-charts.com/es/paletas-colores/>
+
+-   <https://coolors.co/palettes/trending>
+
+-   <https://color.adobe.com/es/>
 
 • USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: <https://r-charts.com/es/ggplot2/temas/>
 
@@ -170,7 +176,8 @@ o ¿Cómo se comporta el factor de expansión? (si aplica)
 
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
-ruta <- "C:/1. MECA/2025/EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón/Datos_proyecto2"
+#getwd()
+ruta <- "data/"
 
 # Base 1: Salud
 salud <- read_dta(file.path(ruta, "Salud.dta"))
@@ -203,7 +210,7 @@ df_salud <- salud %>%
 
 # 2. Base de Características del Hogar (Nivel Persona)
 df_caracteristicas <- caracteristicas %>%
-  select(DIRECTORIO, SECUENCIA_P, ORDEN,
+  select(DIRECTORIO, SECUENCIA_P, ORDEN, FEX_C,
          P6020,       # Sexo
          P6040,       # Edad
          P6051)       # Jefe del hogar
@@ -211,22 +218,19 @@ df_caracteristicas <- caracteristicas %>%
 # 3. Base de Educación (Nivel Persona)
 df_educacion <- educacion %>%
   select(DIRECTORIO, SECUENCIA_P, ORDEN,
-         P8587)       # Variable ejemplo
+         P8587)       # Variable nivel educativo
 
 # 4. Base de Servicios del Hogar (Nivel Hogar)
 df_servicios <- servicios %>%
   select(DIRECTORIO,
          SECUENCIA_P,
-         ORDEN,
-         PERCAPITA,   # Ingreso per cápita
-         FEX_C)       # Factor de expansión (ajusta si tu variable tiene otro nombre)
+         PERCAPITA   # Ingreso per cápita - REVISAR EN EQUIPO
+         )       
 
 # 5. Base de Datos de la Vivienda (Nivel Vivienda)
 df_vivienda <- vivienda %>%
   select(DIRECTORIO,
-         SECUENCIA_P,
          P1_DEPARTAMENTO,
-         ORDEN,
          P1_MUNICIPIO)
 
 ```
@@ -262,23 +266,9 @@ n_dupli_servicios <- df_servicios %>%
   nrow()
 print(paste("Duplicados en Servicios:", n_dupli_servicios))
 
-# Corrección eliminando duplicados
-df_servicios <- df_servicios %>%
-  group_by(DIRECTORIO, SECUENCIA_P) %>%
-  slice_head(n = 1) %>%
-  ungroup()
-
-# Verificar de nuevo
-n_dupli_servicios_post <- df_servicios %>%
-  group_by(DIRECTORIO, SECUENCIA_P) %>%
-  filter(n() > 1) %>%
-  nrow()
-
-print(paste("Duplicados en Servicios después de corregir:", n_dupli_servicios_post))
-
 # 5. VIVIENDA
 n_dupli_vivienda <- df_vivienda %>% 
-  group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
+  group_by(DIRECTORIO) %>% 
   filter(n() > 1) %>% 
   nrow()
 print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
@@ -286,71 +276,339 @@ print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
 ```
 
 ```{r}
-#//////// Se unen las 5 bases ya con las variables seleccionadas
+#//////// Se unen las 5 bases
 df_final <- df_salud %>%
+  # Join 1: Nivel Persona con Persona (Match perfecto)
   left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
+  
+  # Join 2: Nivel Persona con Persona (Match perfecto)
   left_join(df_educacion,       by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
-  left_join(df_servicios,       by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
-  left_join(df_vivienda,        by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN"))
+  
+  # Join 3: Nivel Persona con Hogar (Muchos a Uno)
+  left_join(df_servicios,       by = c("DIRECTORIO", "SECUENCIA_P")) %>%
+  
+  # Join 4: Nivel Persona con Vivienda (Muchos a Uno)
+  left_join(df_vivienda,        by = c("DIRECTORIO"))
 
-# Verificación final de dimensiones
-dim(df_final)
+# revisión general y de los mising
+skimr::skim(df_final)
 
 ```
-
 
 ```{r}
-#///// Limpieza de datos 
-# Se convierten en 0 las variables económicas
-salud <- salud %>% 
-  mutate(
-    gasto_medic = ifelse(is.na(P3182), 0, P3182),
-    gasto_consulta = ifelse(is.na(P3178S2A1), 0, P3178S2A1),
-    gasto_lab = ifelse(is.na(P3183S1), 0, P3183S1)
-  )
+#//////// Renombramiento y limpieza final de variables
+df_final <- df_final %>%
+  rename(
+    # --- Variable Dependiente ---
+    # P1930: ¿Diagnóstico de enfermedad crónica en últimos 12 meses?
+    cronica_12m = P1930,
+    
+    # --- Variable Independiente ---
+    # P1707: ¿Consume bebidas azucaradas?
+    consume_azucar = P1707,
+    # P1707S1: Frecuencia de consumo
+    frecuencia_azucar = P1707S1,
+    
+    # --- Variables de Control (Sociodemográficas) ---
+    # P6020: Sexo
+    sexo = P6020,
+    # P6040: Edad
+    edad = P6040,
+    # P6051: Parentesco con jefe de hogar
+    parentesco = P6051,
+    # P8587: Nivel educativo más alto
+    nivel_educativo = P8587,
+    # Geografía
+    cod_depto = P1_DEPARTAMENTO,
+    cod_mpio  = P1_MUNICIPIO,
+    # Economía del hogar
+    ingreso_pc = PERCAPITA,
+    # Factor de expansión (Peso muestral)
+    fex = FEX_C
+  ) %>%
+  # janitor::clean_names() convierte todo lo restante a minúsculas y snake_case
+  # Ej: DIRECTORIO -> directorio, SECUENCIA_P -> secuencia_p
+  janitor::clean_names()
 
-salud <- salud %>%
-  mutate(
-    fuma = ifelse(P3008 == 1, 1, 0),  # Fuma o no
-    bebe_azu = ifelse(P1707 == 1, 1, 0),
-    ultraprocesados = ifelse(P3003 == 1, 1, 0)
-  )
-
-# Se revisan datos outliers 
-boxplot(salud$gasto_medic)
-boxplot(salud$gasto_consulta)
-boxplot(salud$gasto_lab)
-
-# Percentiles
-quantile(salud$gasto_medic, probs=c(.90,.95,.99,.999))
-
+# Verificación de los nuevos nombres
+skimr::skim(df_final)
 ```
+
+Revisando los NA de educación que deben ser los menores de 5 años
+
+```{r}
+# 1. Crear subconjunto solo con NAs en nivel educativo
+df_educacion_na <- df_final %>%
+  filter(is.na(nivel_educativo))
+
+# 2. Verificación rápida: ¿Quiénes son estos individuos?
+summary(df_educacion_na$edad)
+```
+
+Ahora revisamos la distribución según las diferentes edades
+
+```{r}
+# 3. Distribución de frecuencias de edad en estos nulos
+table(df_educacion_na$edad)
+```
+
+```{r}
+skimr::skim(df_educacion_na)
+```
+
+Excluyendo de los análisis los menores de edad:
+
+Durante la exploración de los datos, se evidenció una ausencia sistemática de información en la variable de **nivel educativo** para la población menor de 18 años (hallazgo estructural derivado del diseño de la encuesta). Dado que el objetivo del presente análisis es caracterizar la relación entre el consumo de bebidas azucaradas y las enfermedades crónicas, se decidió restringir la muestra exclusivamente a **adultos (**$\ge$ 18 años). Esta delimitación obedece a dos criterios prácticos:
+
+1.  **Coherencia en la caracterización socioeconómica:** Para realizar cruces descriptivos válidos según el nivel educativo, es necesario contar con información completa en esta variable. Incluir menores de edad generaría una categoría de "Sin Información" artificialmente alta que dificultaría la interpretación de los perfiles poblacionales.
+
+2.  **Focalización epidemiológica:** Las enfermedades crónicas analizadas son eventos propios de la etapa adulta. Incluir población pediátrica (donde la prevalencia del evento es cercana a cero) distorsionaría las frecuencias relativas y las tasas de prevalencia generales, opacando los patrones de salud que se buscan identificar en la población de riesgo.
+
+```{r}
+# Creación del dataset analítico definitivo
+df_analisis <- df_final %>%
+  # 1. CRITERIO DE INCLUSIÓN: Población Adulta
+  filter(edad >= 18) 
+
+# Verificación final:
+skim(df_analisis)
+```
+
+Ahora teniendo la base de datos casi limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas: 
+
+```{r}
+#//////// Creación de las variables de exposición 
+
+df_analisis <- df_analisis %>%
+  mutate(
+    # 1. Variable de Desenlace (Y) - Convertimos 1=Sí/2=No a 1/0 numérico
+    cronica_binaria = if_else(cronica_12m == 1, 1, 0),
+    
+    # Variables de exposición (X)
+    freq_num = case_when(
+      consume_azucar == 2 ~ 0,
+      TRUE ~ as.numeric(frecuencia_azucar)
+    ),
+    
+    # 2. Variable Agrupada (4 Niveles Totales-abraviada)
+    consumo_agrupado = case_when(
+      freq_num == 0 ~ "No consume",
+      freq_num %in% c(5, 6) ~ "Ocasional (< 2/sem)",
+      freq_num %in% c(3, 4) ~ "Frecuente (2-6/sem)",
+      freq_num %in% c(1, 2) ~ "Diario (Todos los días)"
+    ),
+    
+    # 3. Variable Detallada (7 Niveles Totales: Escala completa)
+    consumo_detallado = factor(freq_num,
+                               levels = c(0, 6, 5, 4, 3, 2, 1), # Ordenamos de menor a mayor intensidad
+                               labels = c("No consume",
+                                          "< 1 vez/sem",
+                                          "1 vez/sem",
+                                          "2-3 veces/sem",
+                                          "4-6 veces/sem",
+                                          "Diario (1)",
+                                          "Diario (2+)"))
+  ) %>%
+  
+  # 4. Paso final: Convertir la variable agrupada a factor ordenado
+  mutate(
+    consumo_agrupado = factor(consumo_agrupado, 
+                              levels = c("No consume", 
+                                         "Ocasional (< 2/sem)", 
+                                         "Frecuente (2-6/sem)", 
+                                         "Diario (Todos los días)"))
+  )
+
+#//////// Verificación de resultados
+
+# Revisamos la variable agrupada (4 niveles)
+print("Conteo Variable Agrupada:")
+count(df_analisis, consumo_agrupado)
+
+# Revisamos la variable detallada (7 niveles)
+print("Conteo Variable Detallada:")
+count(df_analisis, consumo_detallado)
+```
+
+Sacando la edad promedio de las personas por categoría de edad para empezar a construir la lógica de causalidad reversa usando la ponderación del fex: 
+
+```{r}
+# -----------------------------------------------------------------------------
+# TABLA 1: Variable Agrupada (4 Categorías - Semáforo)
+# -----------------------------------------------------------------------------
+tabla_agrupada <- df_analisis %>%
+  filter(!is.na(fex)) %>%
+  group_by(consumo_agrupado) %>%
+  summarise(
+    n_muestra = n(),
+    Poblacion_Estimada = round(sum(fex, na.rm = TRUE), 0),
+    Edad_Promedio = round(weighted.mean(edad, w = fex, na.rm = TRUE), 1),
+    Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
+  )
+
+print("--- RESUMEN POR VARIABLE AGRUPADA (4 NIVELES) ---")
+print(tabla_agrupada)
+
+# -----------------------------------------------------------------------------
+# TABLA 2: Variable Detallada (7 Categorías - Escala Completa)
+# -----------------------------------------------------------------------------
+tabla_detallada <- df_analisis %>%
+  filter(!is.na(fex)) %>%
+  group_by(consumo_detallado) %>%
+  summarise(
+    n_muestra = n(),
+    Poblacion_Estimada = round(sum(fex, na.rm = TRUE), 0),
+    Edad_Promedio = round(weighted.mean(edad, w = fex, na.rm = TRUE), 1),
+    Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
+  )
+
+print("--- RESUMEN POR VARIABLE DETALLADA (7 NIVELES) ---")
+print(tabla_detallada)
+```
+
+```{r}
+# 1. Preparación de la variable de 4 categorías (Estrategia 2)
+df_grafico_4cat <- df_analisis %>%
+  filter(!is.na(fex)) %>% 
+  mutate(
+    # Paso A: Unificar frecuencia numérica (0 para no consumidores)
+    freq_num_tmp = case_when(
+      consume_azucar == 2 ~ 0,
+      TRUE ~ as.numeric(frecuencia_azucar)
+    ),
+    
+    # Paso B: Agrupar en las 4 categorías del "Semáforo"
+    nivel_consumo = case_when(
+      freq_num_tmp == 0 ~ "No consume",
+      freq_num_tmp %in% c(5, 6) ~ "Ocasional (< 2/sem)",
+      freq_num_tmp %in% c(3, 4) ~ "Frecuente (2-6/sem)",
+      freq_num_tmp %in% c(1, 2) ~ "Diario (Todos los días)"
+    ),
+    
+    # Paso C: Ordenar el factor para la gráfica
+    nivel_consumo = factor(nivel_consumo, 
+                           levels = c("No consume", 
+                                      "Ocasional (< 2/sem)", 
+                                      "Frecuente (2-6/sem)", 
+                                      "Diario (Todos los días)"))
+  )
+
+# 2. Cálculo de Estadísticas Ponderadas (Prevalencia + IC)
+summary_4cat_ponderado <- df_grafico_4cat %>%
+  group_by(grupo_edad, nivel_consumo) %>%
+  summarise(
+    n_muestral = n(),
+    
+    # --- PONDERACIÓN CON FEX ---
+    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
+    
+    # Cálculo de error estándar aproximado para encuestas complejas
+    se = sqrt((prevalencia * (1 - prevalencia)) / n_muestral),
+    
+    # Límites del Intervalo de Confianza (95%)
+    lim_inf = prevalencia - (1.96 * se),
+    lim_sup = prevalencia + (1.96 * se),
+    
+    # Ajuste para que no bajen de 0
+    lim_inf = ifelse(lim_inf < 0, 0, lim_inf),
+    
+    .groups = "drop"
+  )
+
+# 3. Visualización (Estilo idéntico al anterior)
+ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = nivel_consumo)) +
+  geom_col(alpha = 0.8) +
+  
+  # Bigotes de error
+  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), 
+                width = 0.2, 
+                color = "black", 
+                linewidth = 0.7) +
+  
+  facet_wrap(~grupo_edad, scales = "free_y") +
+  
+  labs(
+    title = "Prevalencia por Nivel de Consumo (4 Categorías)",
+    subtitle = "Estimación ponderada (FEX_C) con intervalos de confianza del 95%",
+    y = "Prevalencia Estimada (%)",
+    x = "Nivel de Consumo Agrupado",
+    fill = "Nivel de Consumo",
+    caption = "Fuente: Cálculos propios (DANE 2023)."
+  ) +
+  
+  scale_y_continuous(labels = scales::percent) +
+  
+  # Paleta divergente (Azul a Rojo)
+  scale_fill_brewer(palette = "RdYlBu", direction = -1) + 
+  
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    legend.position = "none"
+  )
+```
+Haciendo esta misma gráfica que busca eliminar la confusión pero con una distribución más granular de la variable de consumo de bebidas azucaradas sin ponderación.  
+
+```{r}
+
+# 1. Preparación de datos para gráfico ponderado
+df_grafico_ponderado <- df_analisis %>%
+  filter(!is.na(fex)) %>% 
+  mutate(
+    # Recodificación de Frecuencia 
+    freq_num = case_when(
+      consume_azucar == 2 ~ 0,
+      TRUE ~ as.numeric(frecuencia_azucar)
+    ),
+    frecuencia_full = factor(freq_num,
+                             levels = c(0, 6, 5, 4, 3, 2, 1),
+                             labels = c("No consume",
+                                        "< 1 vez/sem",
+                                        "1 vez/sem",
+                                        "2-3 veces/sem",
+                                        "4-6 veces/sem",
+                                        "Diario (1)",
+                                        "Diario (2+)"))
+  )
+
+# 2. Cálculo de Prevalencias usando el FEX_C 
+summary_ponderado <- df_grafico_ponderado %>%
+  group_by(grupo_edad, frecuencia_full) %>%
+  summarise(
+    # weighted.mean usa el peso FEX_C para expandir a la población real
+    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# 3. Graficando
+ggplot(summary_con_ic, aes(x = frecuencia_full, y = prevalencia, fill = frecuencia_full)) +
+  geom_col(alpha = 0.8) + 
+  
+  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), 
+                width = 0.2,    
+                color = "black", 
+                linewidth = 0.7) + # <--- AQUÍ ESTÁ EL CAMBIO (antes era size)
+  
+  facet_wrap(~grupo_edad, scales = "free_y") +
+  
+  labs(
+    title = "Prevalencia Poblacional con Intervalos de Confianza (95%)",
+    subtitle = "Estimación ponderada (FEX_C) con margen de error",
+    y = "Prevalencia Estimada (%)",
+    x = "Intensidad de Consumo",
+    caption = "Fuente: Cálculos propios (DANE 2023). Bigotes indican IC 95%."
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    legend.position = "none"
+  )
+```
+
 
 -   Estandarizar nombres (mayúsculas/acentos) en intro4 e intro5: en este paso ajustamos los nombres de departamento y municipio para mejorar la presentación de los datos de aquí en adelante. Y también se hace un proceso de estandarización usando clean:names() de janitor.
-
-```{r}
-# Cambiar nombres y estandarizar
-data_hogares <- hogares %>%
-   rename(
-    DPNOM = intro4,  # Departamento
-    MPIO  = intro5   # Municipio
-  ) %>%
-  mutate(
-    DPNOM = DPNOM %>%
-      str_to_lower() %>%
-      str_trim() %>%
-      stri_trans_general("Latin-ASCII") %>%
-      str_to_title(),
-    
-    MPIO = MPIO %>%
-      str_to_lower() %>%
-      str_trim() %>%
-      stri_trans_general("Latin-ASCII") %>%
-      str_to_title()
-  ) %>% 
-  clean_names()
-
-```
 
 ### 2.2) Análisis univariado sistemático
 
@@ -360,11 +618,179 @@ Para cada variable relevante incluya:
 
 • Tablas de frecuencia o estadísticas descriptivas, según su tipo.
 
+```{r}
+# Calculamos los indicadores globales ponderados
+tabla_indicadores_globales <- df_analisis %>%
+  filter(!is.na(fex)) %>% # Seguridad: eliminar pesos perdidos
+  summarise(
+    # --- 1. Totales Poblacionales ---
+    # Sumamos el factor de expansión para ver el universo total
+    Poblacion_Total_Est = sum(fex),
+    
+    # --- 2. Indicadores de Consumo de Bebidas Azucaradas ---
+    # Numerador: Suma de FEX donde consume_azucar es 1 (Sí)
+    Poblacion_Consume_Est = sum(fex[consume_azucar == 1]),
+    # Proporción: Promedio ponderado de la condición (TRUE/FALSE)
+    Prop_Consumo_Porc = weighted.mean(consume_azucar == 1, w = fex) * 100,
+    
+    # --- 3. Indicadores de Enfermedad Crónica ---
+    # Numerador: Suma de FEX donde cronica_binaria es 1
+    Poblacion_Enferma_Est = sum(fex[cronica_binaria == 1]),
+    # Proporción: Promedio ponderado
+    Prop_Enfermedad_Porc = weighted.mean(cronica_binaria, w = fex) * 100
+  ) %>%
+  
+  # Formato para facilitar la lectura (Redondear y pasar a Millones si quieres)
+  mutate(
+    Poblacion_Total_Millones = round(Poblacion_Total_Est / 1e6, 2),
+    Poblacion_Consume_Millones = round(Poblacion_Consume_Est / 1e6, 2),
+    Poblacion_Enferma_Millones = round(Poblacion_Enferma_Est / 1e6, 2),
+    
+    # Redondear porcentajes
+    Prop_Consumo_Porc = round(Prop_Consumo_Porc, 2),
+    Prop_Enfermedad_Porc = round(Prop_Enfermedad_Porc, 2)
+  ) %>%
+  
+  # Seleccionamos las columnas finales para el reporte
+  select(Poblacion_Total_Millones, 
+         Poblacion_Consume_Millones, Prop_Consumo_Porc,
+         Poblacion_Enferma_Millones, Prop_Enfermedad_Porc)
+
+# Imprimimos la tabla
+print(tabla_indicadores_globales)
+```
+
+
 • Uno o dos gráficos univariados pertinentes como histogramas, gráficos de barras, boxplots simples, diagramas de densidad. Este análisis sirve como la base conceptual del proyecto: sin esta revisión, cualquier cruce posterior puede ser engañoso o incorrecto.
 
 ### 2.3) Análisis bivariado guiado por la pregunta
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
+
+Tabla de cruce entre X y Y
+```{r}
+# 1. Generar la tabla cruzada ponderada
+tabla_cruce_fex <- df_analisis %>%
+  # Filtramos pesos perdidos para evitar errores
+  filter(!is.na(fex)) %>% 
+  
+  # Agrupamos por las dos variables de interés
+  group_by(consumo_agrupado, cronica_binaria) %>% 
+  
+  # Sumamos el FEX para obtener la población estimada en cada celda
+  summarise(
+    poblacion_est = sum(fex, na.rm = TRUE), 
+    .groups = "drop_last" # Mantenemos el grupo de consumo para calcular %
+  ) %>% 
+  
+  # Calculamos el porcentaje dentro de cada fila (Row Percentage)
+  mutate(
+    total_grupo = sum(poblacion_est),
+    porcentaje = (poblacion_est / total_grupo) * 100
+  ) %>%
+  
+  # Mejoramos la etiqueta de la enfermedad para la presentación
+  mutate(
+    Estado_Salud = ifelse(cronica_binaria == 1, "Enfermo", "Sano"),
+    # Formato numérico limpio (miles y un decimal)
+    Poblacion_Format = format(round(poblacion_est, 0), big.mark = ","),
+    Porcentaje_Format = paste0(round(porcentaje, 2), "%")
+  ) %>%
+  
+  # Seleccionamos y ordenamos para mostrar
+  select(consumo_agrupado, Estado_Salud, Poblacion_Format, Porcentaje_Format) %>%
+  arrange(consumo_agrupado, desc(Estado_Salud))
+
+# 2. Visualizar la tabla en formato "Largo" (Detallada)
+print(tabla_cruce_fex)
+
+# -------------------------------------------------------
+# OPCIÓN B: Formato "Ancho" (Tipo Matriz - Ideal para copiar a Excel/Word)
+# -------------------------------------------------------
+
+library(tidyr)
+
+tabla_matriz <- df_analisis %>%
+  filter(!is.na(fex)) %>%
+  group_by(consumo_agrupado) %>%
+  summarise(
+    # Calculamos columnas separadas sumando el FEX condicionalmente
+    Pob_Sanos = sum(fex[cronica_binaria == 0], na.rm = TRUE),
+    Pob_Enfermos = sum(fex[cronica_binaria == 1], na.rm = TRUE),
+    Total = sum(fex, na.rm = TRUE),
+    Prevalencia_Enfermedad = (Pob_Enfermos / Total) * 100
+  ) %>%
+  # Formato visual
+  mutate(
+    Pob_Sanos = format(round(Pob_Sanos, 0), big.mark = ","),
+    Pob_Enfermos = format(round(Pob_Enfermos, 0), big.mark = ","),
+    Total = format(round(Total, 0), big.mark = ","),
+    Prevalencia_Enfermedad = paste0(round(Prevalencia_Enfermedad, 2), "%")
+  )
+
+print("--- TABLA MATRIZ RESUMEN ---")
+print(tabla_matriz)
+```
+
+Modelo multivariado: 
+
+```{r}
+# 1. Re-nivelar la variable para que la referencia sea "Ocasional"
+# Esto es CRÍTICO para aislar el efecto de causalidad reversa
+df_modelo <- df_analisis %>%
+  mutate(
+    consumo_relevel = relevel(consumo_agrupado, ref = "Ocasional (< 2/sem)")
+  )
+
+# Verificamos que "Ocasional" sea ahora el primero
+levels(df_modelo$consumo_relevel)
+```
+```{r}
+# 1. Limpieza de datos (Casos Completos)
+# Eliminamos filas con NA en fex, ingreso o variables del modelo
+df_modelo_final <- df_modelo %>%
+  filter(
+    !is.na(fex),                 # Obligatorio para el diseño
+    !is.na(ingreso_pc),          # Variable de control económica
+    !is.na(consumo_relevel),     # Exposición
+    !is.na(cronica_binaria),     # Desenlace
+    !is.na(edad),                # Control
+    !is.na(sexo),                # Control
+    !is.na(nivel_educativo)      # Control
+  )
+
+# 2. Definición del Diseño Muestral
+# Ahora sí, con la base limpia, no debería salir error
+diseno_encuesta <- svydesign(
+  ids = ~1, 
+  weights = ~fex, 
+  data = df_modelo_final
+)
+
+# 3. Ajuste del Modelo Logístico Ponderado
+# Agregamos 'ingreso_pc' a la fórmula para controlar por capacidad económica
+modelo_logistico <- svyglm(
+  cronica_binaria ~ consumo_relevel + edad + sexo + nivel_educativo + ingreso_pc, 
+  design = diseno_encuesta,
+  family = quasibinomial(link = "logit") 
+)
+
+# 4. Extraer Resultados (OR e Intervalos de Confianza)
+resultados_or <- tidy(modelo_logistico, exponentiate = TRUE, conf.int = TRUE) %>%
+  select(term, estimate, std.error, conf.low, conf.high, p.value) %>%
+  mutate(
+    # Limpieza de nombres para facilitar la lectura
+    term = str_replace(term, "consumo_relevel", "Comparado con Ocasional: "),
+    term = str_remove(term, "nivel_educativo")
+  ) %>%
+  # Filtramos para ver las variables principales primero
+  filter(str_detect(term, "Comparado con|edad|sexo|ingreso"))
+
+# 5. Imprimir la tabla final
+print(resultados_or)
+```
+
+
 
 # Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados
 
