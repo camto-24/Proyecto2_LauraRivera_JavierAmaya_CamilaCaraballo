@@ -177,7 +177,7 @@ o ¿Cómo se comporta el factor de expansión? (si aplica)
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
 #getwd()
-ruta <- "data/"
+ruta <- "C:/1. MECA/2025/EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón/Datos_proyecto2"
 
 # Base 1: Salud
 salud <- read_dta(file.path(ruta, "Salud.dta"))
@@ -266,6 +266,20 @@ n_dupli_servicios <- df_servicios %>%
   nrow()
 print(paste("Duplicados en Servicios:", n_dupli_servicios))
 
+# Corrección eliminando duplicados
+df_servicios <- df_servicios %>%
+  group_by(DIRECTORIO, SECUENCIA_P) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+# Verificar de nuevo
+n_dupli_servicios_post <- df_servicios %>%
+  group_by(DIRECTORIO, SECUENCIA_P) %>%
+  filter(n() > 1) %>%
+  nrow()
+
+print(paste("Duplicados en Servicios después de corregir:", n_dupli_servicios_post))
+
 # 5. VIVIENDA
 n_dupli_vivienda <- df_vivienda %>% 
   group_by(DIRECTORIO) %>% 
@@ -294,6 +308,8 @@ df_final <- df_salud %>%
 skimr::skim(df_final)
 
 ```
+
+La base fue cargada correctamente y contiene 240.212 observaciones y 14 variables, tal como se observa en el resumen general generado por skim(). La estructura también se verificó: el conjunto tiene 12 variables numéricas y 2 variables de tipo carácter.
 
 ```{r}
 #//////// Renombramiento y limpieza final de variables
@@ -326,13 +342,57 @@ df_final <- df_final %>%
     # Factor de expansión (Peso muestral)
     fex = FEX_C
   ) %>%
-  # janitor::clean_names() convierte todo lo restante a minúsculas y snake_case
-  # Ej: DIRECTORIO -> directorio, SECUENCIA_P -> secuencia_p
   janitor::clean_names()
 
 # Verificación de los nuevos nombres
 skimr::skim(df_final)
 ```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(kableExtra)
+
+tabla_resumen <- df_final %>%
+  summarise(across(
+    everything(),
+    list(
+      tipo = ~ as.character(class(.x)[1]),
+      na = ~ as.character(sum(is.na(.x))),
+      na_porc = ~ as.character(round(mean(is.na(.x)) * 100, 2)),
+      min = ~ if (is.numeric(.x)) as.character(min(.x, na.rm = TRUE)) else NA,
+      max = ~ if (is.numeric(.x)) as.character(max(.x, na.rm = TRUE)) else NA,
+      media = ~ if (is.numeric(.x)) as.character(round(mean(.x, na.rm = TRUE), 2)) else NA,
+      mediana = ~ if (is.numeric(.x)) as.character(median(.x, na.rm = TRUE)) else NA,
+      n_categorias = ~ if (!is.numeric(.x)) as.character(length(unique(.x))) else NA
+    ),
+    .names = "{col}__{fn}"
+  )) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("variable", "estadistica"),
+    names_sep = "__",
+    values_to = "valor"
+  ) %>%
+  pivot_wider(
+    names_from = estadistica,
+    values_from = valor
+  )
+
+# Mostrar tabla HTML
+tabla_html <- tabla_resumen %>%
+  kable("html") %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover"))
+
+tabla_html
+
+save_kable(tabla_html, "Graficos-tablas/tabla_resumen_df_final.html")
+
+
+```
+
+
 
 Revisando los NA de educación que deben ser los menores de 5 años
 
