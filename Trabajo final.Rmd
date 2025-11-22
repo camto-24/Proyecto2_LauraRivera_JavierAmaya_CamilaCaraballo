@@ -619,14 +619,26 @@ print(tabla_detallada)
 ```
 
 ```{r}
-# 1. Preparación de la variable de 4 categorías (Estrategia 2)
+# =========================================
+# 0. Paquetes necesarios
+# =========================================
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+# Paleta personalizada (ya la tenías)
+pal <- paletteer::paletteer_c("ggthemes::Blue-Teal", 30)
+
+# =========================================
+# 1. Preparación de la variable de 4 categorías
+# =========================================
 df_grafico_4cat <- df_analisis %>%
   filter(!is.na(fex)) %>% 
   mutate(
     # Paso A: Unificar frecuencia numérica (0 para no consumidores)
     freq_num_tmp = case_when(
       consume_azucar == 2 ~ 0,
-      TRUE ~ as.numeric(frecuencia_azucar)
+      TRUE ~ as.numeric(as.character(frecuencia_azucar))
     ),
     
     # Paso B: Agrupar en las 4 categorías del "Semáforo"
@@ -642,11 +654,16 @@ df_grafico_4cat <- df_analisis %>%
                            levels = c("No consume", 
                                       "Ocasional (< 2/sem)", 
                                       "Frecuente (2-6/sem)", 
-                                      "Diario (Todos los días)"))
-  )
-
-# Se crea la variable de grupo edad
-df_grafico_4cat <- df_grafico_4cat %>%
+                                      "Diario (Todos los días)")),
+    
+    # Re-codificar cronica_binaria a 0/1
+    cronica_binaria_num = case_when(
+      cronica_binaria %in% c("Sí", "si", "SI", 1) ~ 1,
+      cronica_binaria %in% c("No", "no", "NO", 0) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  # Crear la variable de grupo edad
   mutate(
     grupo_edad = case_when(
       edad >= 18 & edad <= 29 ~ "18-29",
@@ -657,54 +674,58 @@ df_grafico_4cat <- df_grafico_4cat %>%
     )
   )
 
-# 2. Cálculo de Estadísticas Ponderadas (Prevalencia + IC)
+# =========================================
+# 2. Cálculo de Estadísticas Ponderadas
+# =========================================
 summary_4cat_ponderado <- df_grafico_4cat %>%
   group_by(grupo_edad, nivel_consumo) %>%
   summarise(
     n_muestral = n(),
     
-    # --- PONDERACIÓN CON FEX ---
-    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
+    # Prevalencia ponderada
+    prevalencia = weighted.mean(cronica_binaria_num, w = fex, na.rm = TRUE),
     
-    # Cálculo de error estándar aproximado para encuestas complejas
+    # Error estándar aproximado
     se = sqrt((prevalencia * (1 - prevalencia)) / n_muestral),
     
-    # Límites del Intervalo de Confianza (95%)
-    lim_inf = prevalencia - (1.96 * se),
-    lim_sup = prevalencia + (1.96 * se),
-    
-    # Ajuste para que no bajen de 0
-    lim_inf = ifelse(lim_inf < 0, 0, lim_inf),
+    # Intervalo de Confianza 95%
+    lim_inf = pmax(prevalencia - 1.96 * se, 0),
+    lim_sup = pmin(prevalencia + 1.96 * se, 1),
     
     .groups = "drop"
   )
 
-# 3. Visualización 
-grafico2 <- ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = as.numeric(nivel_consumo))) +
+# =========================================
+# 3. Visualización
+# =========================================
+grafico2 <- ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = nivel_consumo)) +
   geom_col(alpha = 0.8) +
   geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), width = 0.2, color = "black", linewidth = 0.7) +
   facet_wrap(~grupo_edad, scales = "free_y") +
   labs(
     title = "Prevalencia por Nivel de Consumo (4 Categorías)",
-    subtitle = "Estimación ponderada (FEX_C) con intervalos de confianza del 95%",
+    subtitle = "Estimación ponderada (FEX) con intervalos de confianza del 95%",
     y = "Prevalencia Estimada (%)",
     x = "Nivel de Consumo Agrupado",
-    fill = "Intensidad de Consumo",
-    caption = "Fuente: Cálculos propios (DANE 2023)."
+    fill = "Nivel de Consumo",
+    caption = "Fuente: Cálculos propios."
   ) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_gradientn(colors = pal[c(5, 10, 20, 30)]) +  # degradado para las 4 categorías
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  scale_fill_manual(values = pal[c(5, 10, 20, 30)]) +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
     legend.position = "right"
   )
 
-# Mostrar el gráfico
+# Mostrar gráfico
 print(grafico2)
 
-# 4. Guardar el gráfico
+# =========================================
+# 4. Guardar gráfico
+# =========================================
 ggsave("Graficos-tablas/grafico2.png", plot = grafico2, width = 10, height = 6, dpi = 300)
+
 ```
 Haciendo esta misma gráfica que busca eliminar la confusión pero con una distribución más granular de la variable de consumo de bebidas azucaradas sin ponderación.  
 
@@ -874,23 +895,15 @@ tabla_resumen <- df_analisis %>%
 tabla_resumen
 ```
 
-
-
 ```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(kableExtra)
-library(paletteer)
-
-# Variables Categóricas (Pocas opciones: Hombre/Mujer, Sí/No, Niveles)
+# Variables Categóricas 
 vars_categoricas <- list(
   "Habitos" = c("consume_azucar", "frecuencia_azucar"),
   "Sociodemograficas" = c("sexo", "parentesco", "nivel_educativo"),
   "Salud" = c("cronica_12m", "cronica_binaria")
 )
 
-# Variables Numéricas (Rango amplio: Edad, Dinero)
+# Variables Numéricas 
 vars_numericas <- list(
   "Sociodemograficas" = c("edad", "ingreso_pc")
 )
@@ -998,6 +1011,19 @@ analisis_univariado_cont <- function(varname, df) {
   ggsave(paste0("Graficos-tablas/grafico_num_", varname, ".png"), plot = grafico, width = 10, height = 6)
 }
 
+# --- Variables categóricas
+for(grupo in names(vars_categoricas)){
+  for(varname in vars_categoricas[[grupo]]){
+    analisis_univariado_cat(varname, df_analisis)
+  }
+}
+
+# --- Variables numéricas
+for(grupo in names(vars_numericas)){
+  for(varname in vars_numericas[[grupo]]){
+    analisis_univariado_cont(varname, df_analisis)
+  }
+}
 ```
 
 ```{r}
