@@ -27,6 +27,13 @@ pacman::p_load(
   openxlsx,     # Guardar excel
   writexl,      # Guardar excel
   haven,
+  kableExtra,
+  paletteer,
+  ggplot2,
+  broom,
+  stringr,
+  gt,
+  webshot2,
 
   # B) Modelado y análisis estadístico/econométrico
   fixest,       # Estimación de modelos de efectos fijos de alto rendimiento.
@@ -155,24 +162,6 @@ Además, al contar con información territorial por departamento y municipio, es
 • USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: <https://r-charts.com/es/ggplot2/temas/>
 
 ### 2.1) Preparación y comprensión inicial de los datos
-
-• Carga de los datos y verificación de estructuras básicas (número de observaciones, número de variables, tipos de variables).
-
-• Revisión de codificación:
-
-o ¿Sus variables numéricas son realmente numéricas?
-
-o ¿Las categorías están completas y correctamente etiquetadas?
-
-o ¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?
-
-o ¿Cómo se comporta el factor de expansión? (si aplica)
-
-• Tratamiento de faltantes donde se registre cómo se manejan NA y categorías especiales.
-
-• Identificación de valores atípicos o valores imposibles
-
-• Recodificaciones necesarias, como reagrupar categorías raras, crear bandas, construir conteos de carencias o generar proxies. Todo ajuste debe quedar documentado mediante comentarios o un resumen breve dentro del informe a modo de notas de método
 
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
@@ -309,7 +298,7 @@ skimr::skim(df_final)
 
 ```
 
-La base fue cargada correctamente y contiene 240.212 observaciones y 14 variables, tal como se observa en el resumen general generado por skim(). La estructura también se verificó: el conjunto tiene 12 variables numéricas y 2 variables de tipo carácter.
+La base fue cargada correctamente y contiene 240.212 observaciones y 14 variables, tal como se observa en el resumen general generado por skim(). La estructura también se verificó: el conjunto tiene 12 variables numéricas y 2 variables de tipo carácter. Ahora se realizará un cambio a los nombres de las variables:
 
 ```{r}
 #//////// Renombramiento y limpieza final de variables
@@ -349,71 +338,145 @@ skimr::skim(df_final)
 ```
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(kableExtra)
 
+#//////// Se revisa la base 
+
+# 1. Detectar categorías especiales
+
+categorias_especiales <- c(
+  "No sabe", "No responde", "Ns/Nr",
+  "ns", "nr", "sin dato", "no aplica",
+  98, 99, 999, 9999
+)
+
+# 2. Función auxiliar para detectar outliers (método IQR)
+detectar_outliers <- function(x) {
+  if (!is.numeric(x)) return(NA_integer_)
+  q1 <- quantile(x, 0.25, na.rm = TRUE)
+  q3 <- quantile(x, 0.75, na.rm = TRUE)
+  iqr <- q3 - q1
+  sum(x < (q1 - 1.5*iqr) | x > (q3 + 1.5*iqr), na.rm = TRUE)
+}
+
+# 3. Tabla resumen completa
 tabla_resumen <- df_final %>%
-  summarise(across(
-    everything(),
-    list(
-      tipo = ~ as.character(class(.x)[1]),
-      na = ~ as.character(sum(is.na(.x))),
-      na_porc = ~ as.character(round(mean(is.na(.x)) * 100, 2)),
-      min = ~ if (is.numeric(.x)) as.character(min(.x, na.rm = TRUE)) else NA,
-      max = ~ if (is.numeric(.x)) as.character(max(.x, na.rm = TRUE)) else NA,
-      media = ~ if (is.numeric(.x)) as.character(round(mean(.x, na.rm = TRUE), 2)) else NA,
-      mediana = ~ if (is.numeric(.x)) as.character(median(.x, na.rm = TRUE)) else NA,
-      n_categorias = ~ if (!is.numeric(.x)) as.character(length(unique(.x))) else NA
-    ),
-    .names = "{col}__{fn}"
-  )) %>%
-  pivot_longer(
-    cols = everything(),
-    names_to = c("variable", "estadistica"),
-    names_sep = "__",
-    values_to = "valor"
+  summarise(
+    variable = names(.),
+    tipo = map_chr(., ~ class(.x)[1]),
+    n_observaciones = map_int(., length),
+    n_na = map_int(., ~ sum(is.na(.x))),
+    categorias_especiales = map_int(., ~ sum(.x %in% categorias_especiales)),
+    mezcla_ns_nr = map_lgl(., ~ any(.x %in% categorias_especiales) & !all(.x %in% categorias_especiales)),
+    outliers = map_int(., detectar_outliers)
   ) %>%
-  pivot_wider(
-    names_from = estadistica,
-    values_from = valor
-  )
+  unnest(cols = c(tipo, n_observaciones, n_na, categorias_especiales, mezcla_ns_nr, outliers))
 
-# Mostrar tabla HTML
-tabla_html <- tabla_resumen %>%
-  kable("html") %>%
-  kable_styling(full_width = FALSE,
-                bootstrap_options = c("striped", "hover"))
+tabla_resumen
 
-tabla_html
-
-save_kable(tabla_html, "Graficos-tablas/tabla_resumen_df_final.html")
-
+# Ver las categorías especiales y estan ok a lo que es la variable
+sort(unique(df_final$edad))
+sort(unique(df_final$cod_depto))
 
 ```
 
 
+```{r}
+# //////// Cambiar el tipo a las variables 
+df_final <- df_final %>%
+  mutate(
+    directorio = as.character(directorio),
+    secuencia_p = as.character(secuencia_p),
+    orden = as.character(orden),
+    sexo              = factor(sexo),
+    consume_azucar    = factor(consume_azucar),
+    frecuencia_azucar = factor(frecuencia_azucar),
+    cronica_12m       = factor(cronica_12m),
+    parentesco        = factor(parentesco),
+    nivel_educativo   = factor(nivel_educativo),
+    cod_mpio          = factor(cod_mpio)
+  )
+summary(df_final)
+```
 
-Revisando los NA de educación que deben ser los menores de 5 años
+Revisión de outliers: Se identificaron valores atípicos en las variables Fex e ingreso_pc. La variable Fex se mantiene sin modificaciones, ya que es la variable de expansión. En cuanto a ingreso_pc, se revisaron los valores extremos, pero no se realizaron correcciones, dado que el valor máximo corresponde a 250 millones y se considera válido
 
 ```{r}
+# Se revisan cuantiles de las dos variables que tienen outliers
+quantile(df_final$fex, probs = c(0.95,0.99,0.999), na.rm = TRUE)
+quantile(df_final$ingreso_pc, probs = c(0.95,0.99,0.999), na.rm = TRUE)
+
+# Se revisan estadísticas de las dos variables que tienen outliers
+summary(df_final$fex)
+summary(df_final$ingreso_pc)
+
+# Se grafica el outliers de ingreso
+
+# Paleta azul–teal
+pal <- paletteer::paletteer_c("ggthemes::Blue-Teal", 30)
+
+# Calcular límites de outliers
+Q1 <- quantile(df_final$ingreso_pc, 0.25, na.rm = TRUE)
+Q3 <- quantile(df_final$ingreso_pc, 0.75, na.rm = TRUE)
+IQR <- Q3 - Q1
+limite_superior <- Q3 + 1.5 * IQR
+
+# Histograma 
+hist_plot <- ggplot() +
+  # Valores normales
+  geom_histogram(
+    data = filter(df_final, ingreso_pc <= limite_superior),
+    aes(x = ingreso_pc),
+    fill = pal[15], color = "white", bins = 50
+  ) +
+  # Valores extremos
+  geom_histogram(
+    data = filter(df_final, ingreso_pc > limite_superior),
+    aes(x = ingreso_pc),
+    fill = "red", color = "white", bins = 50
+  ) +
+  scale_x_log10(labels = scales::comma) +
+  labs(
+    title = "Distribución del Ingreso per Cápita",
+    x = "Ingreso per cápita (log10)",
+    y = "Frecuencia"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid = element_blank())
+
+# Mostrar gráfico
+print(hist_plot)
+
+# Guardar el gráfico
+ggsave("Graficos-tablas/histograma_ingreso_pc.png", plot = hist_plot, width = 8, height = 6, dpi = 300)
+
+```
+
+
+Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con los de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron con la mediana por municipio
+
+```{r}
+#//////// Revisando los NA de educación que deben ser los menores de 5 años
 # 1. Crear subconjunto solo con NAs en nivel educativo
 df_educacion_na <- df_final %>%
   filter(is.na(nivel_educativo))
 
 # 2. Verificación rápida: ¿Quiénes son estos individuos?
 summary(df_educacion_na$edad)
-```
 
-Ahora revisamos la distribución según las diferentes edades
+#//////// Ahora revisamos la distribución según las diferentes edades
 
-```{r}
 # 3. Distribución de frecuencias de edad en estos nulos
 table(df_educacion_na$edad)
-```
 
-```{r}
 skimr::skim(df_educacion_na)
+
+#//////// Se mantienen los NA de las variables de consume_azucar, frecuencia_azucar, nivel_educativo pero se imputa la de ingreso
+df_final <- df_final %>%
+  group_by(cod_mpio) %>%
+  mutate(ingreso_pc = ifelse(is.na(ingreso_pc),
+                             median(ingreso_pc, na.rm = TRUE),
+                             ingreso_pc)) %>%
+  ungroup()
 ```
 
 Excluyendo de los análisis los menores de edad:
@@ -434,33 +497,46 @@ df_analisis <- df_final %>%
 skim(df_analisis)
 ```
 
-Ahora teniendo la base de datos casi limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas: 
+Ahora teniendo la base de datos limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas: 
 
 ```{r}
-#//////// Creación de las variables de exposición 
+# 1. PREPARACIÓN DE DATOS
+# Realizamos todas las transformaciones y etiquetado en un solo bloque para evitar conflictos.
 
 df_analisis <- df_analisis %>%
   mutate(
-    # 1. Variable de Desenlace (Y) - Convertimos 1=Sí/2=No a 1/0 numérico
-    cronica_binaria = if_else(cronica_12m == 1, 1, 0),
+    # --- A. Variable de Desenlace (Y) ---
+    # Primero numérico 0/1
+    cronica_num = if_else(cronica_12m == 1, 1, 0),
+    # Inmediatamente lo convertimos a Factor con etiquetas finales
+    cronica_binaria = factor(cronica_num, 
+                             levels = c(0, 1), 
+                             labels = c("No", "Sí")),
     
-    # Variables de exposición (X)
+    # --- B. Variables de exposición (X) ---
     freq_num = case_when(
       consume_azucar == 2 ~ 0,
       TRUE ~ as.numeric(frecuencia_azucar)
     ),
     
-    # 2. Variable Agrupada (4 Niveles Totales-abraviada)
-    consumo_agrupado = case_when(
+    # Agrupada (Texto temporal)
+    consumo_agrupado_txt = case_when(
       freq_num == 0 ~ "No consume",
       freq_num %in% c(5, 6) ~ "Ocasional (< 2/sem)",
       freq_num %in% c(3, 4) ~ "Frecuente (2-6/sem)",
       freq_num %in% c(1, 2) ~ "Diario (Todos los días)"
     ),
     
-    # 3. Variable Detallada (7 Niveles Totales: Escala completa)
+    # Convertimos Agrupada a Factor Ordenado
+    consumo_agrupado = factor(consumo_agrupado_txt, 
+                              levels = c("No consume", 
+                                         "Ocasional (< 2/sem)", 
+                                         "Frecuente (2-6/sem)", 
+                                         "Diario (Todos los días)")),
+    
+    # Variable Detallada (Factor Ordenado directo)
     consumo_detallado = factor(freq_num,
-                               levels = c(0, 6, 5, 4, 3, 2, 1), # Ordenamos de menor a mayor intensidad
+                               levels = c(0, 6, 5, 4, 3, 2, 1),
                                labels = c("No consume",
                                           "< 1 vez/sem",
                                           "1 vez/sem",
@@ -468,34 +544,54 @@ df_analisis <- df_analisis %>%
                                           "4-6 veces/sem",
                                           "Diario (1)",
                                           "Diario (2+)"))
-  ) %>%
-  
-  # 4. Paso final: Convertir la variable agrupada a factor ordenado
-  mutate(
-    consumo_agrupado = factor(consumo_agrupado, 
-                              levels = c("No consume", 
-                                         "Ocasional (< 2/sem)", 
-                                         "Frecuente (2-6/sem)", 
-                                         "Diario (Todos los días)"))
   )
 
-#//////// Verificación de resultados
+# 2. CONFIGURACIÓN DE EXPORTACIÓN
 
-# Revisamos la variable agrupada (4 niveles)
-print("Conteo Variable Agrupada:")
-count(df_analisis, consumo_agrupado)
+# Función 
+tabla_frec <- function(datos, var) {
+  datos %>%
+    count({{var}}, .drop = FALSE) %>% 
+    mutate(
+      n = as.integer(n), # Asegurar que n es entero
+      porcentaje = round(n / sum(n) * 100, 1)
+    ) %>%
+    rename(Categoria = 1, Frecuencia = n, `%` = porcentaje)
+}
 
-# Revisamos la variable detallada (7 niveles)
-print("Conteo Variable Detallada:")
-count(df_analisis, consumo_detallado)
+# 3. GENERACIÓN Y GUARDADO DE TABLAS
+lista_tablas <- list(
+  "Variable_Agrupada" = df_analisis %>% tabla_frec(consumo_agrupado),
+  "Variable_Detallada" = df_analisis %>% tabla_frec(consumo_detallado),
+  "Variable_Desenlace_Cronica" = df_analisis %>% tabla_frec(cronica_binaria)
+)
+
+for (nombre in names(lista_tablas)) {
+  
+  # Definir ruta
+  ruta_archivo <- file.path("Graficos-tablas", paste0(nombre, ".html"))
+  
+  # Crear HTML con kable
+  html_tabla <- lista_tablas[[nombre]] %>%
+    kable(format = "html", 
+          caption = gsub("_", " ", nombre), # Título legible en la tabla
+          align = 'c') %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = F, 
+                  position = "center") %>%
+    column_spec(1, bold = T) %>% # Negrita a la primera columna
+    as.character()
+  
+  # Guardar
+  writeLines(html_tabla, ruta_archivo)
+}
 ```
+
 
 Sacando la edad promedio de las personas por categoría de edad para empezar a construir la lógica de causalidad reversa usando la ponderación del fex: 
 
 ```{r}
-# -----------------------------------------------------------------------------
 # TABLA 1: Variable Agrupada (4 Categorías - Semáforo)
-# -----------------------------------------------------------------------------
 tabla_agrupada <- df_analisis %>%
   filter(!is.na(fex)) %>%
   group_by(consumo_agrupado) %>%
@@ -506,12 +602,9 @@ tabla_agrupada <- df_analisis %>%
     Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
   )
 
-print("--- RESUMEN POR VARIABLE AGRUPADA (4 NIVELES) ---")
 print(tabla_agrupada)
 
-# -----------------------------------------------------------------------------
 # TABLA 2: Variable Detallada (7 Categorías - Escala Completa)
-# -----------------------------------------------------------------------------
 tabla_detallada <- df_analisis %>%
   filter(!is.na(fex)) %>%
   group_by(consumo_detallado) %>%
@@ -522,7 +615,6 @@ tabla_detallada <- df_analisis %>%
     Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
   )
 
-print("--- RESUMEN POR VARIABLE DETALLADA (7 NIVELES) ---")
 print(tabla_detallada)
 ```
 
@@ -553,6 +645,18 @@ df_grafico_4cat <- df_analisis %>%
                                       "Diario (Todos los días)"))
   )
 
+# Se crea la variable de grupo edad
+df_grafico_4cat <- df_grafico_4cat %>%
+  mutate(
+    grupo_edad = case_when(
+      edad >= 18 & edad <= 29 ~ "18-29",
+      edad >= 30 & edad <= 44 ~ "30-44",
+      edad >= 45 & edad <= 59 ~ "45-59",
+      edad >= 60 ~ "60+",
+      TRUE ~ NA_character_
+    )
+  )
+
 # 2. Cálculo de Estadísticas Ponderadas (Prevalencia + IC)
 summary_4cat_ponderado <- df_grafico_4cat %>%
   group_by(grupo_edad, nivel_consumo) %>%
@@ -575,37 +679,32 @@ summary_4cat_ponderado <- df_grafico_4cat %>%
     .groups = "drop"
   )
 
-# 3. Visualización (Estilo idéntico al anterior)
-ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = nivel_consumo)) +
+# 3. Visualización 
+grafico2 <- ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = as.numeric(nivel_consumo))) +
   geom_col(alpha = 0.8) +
-  
-  # Bigotes de error
-  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), 
-                width = 0.2, 
-                color = "black", 
-                linewidth = 0.7) +
-  
+  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), width = 0.2, color = "black", linewidth = 0.7) +
   facet_wrap(~grupo_edad, scales = "free_y") +
-  
   labs(
     title = "Prevalencia por Nivel de Consumo (4 Categorías)",
     subtitle = "Estimación ponderada (FEX_C) con intervalos de confianza del 95%",
     y = "Prevalencia Estimada (%)",
     x = "Nivel de Consumo Agrupado",
-    fill = "Nivel de Consumo",
+    fill = "Intensidad de Consumo",
     caption = "Fuente: Cálculos propios (DANE 2023)."
   ) +
-  
   scale_y_continuous(labels = scales::percent) +
-  
-  # Paleta divergente (Azul a Rojo)
-  scale_fill_brewer(palette = "RdYlBu", direction = -1) + 
-  
+  scale_fill_gradientn(colors = pal[c(5, 10, 20, 30)]) +  # degradado para las 4 categorías
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    legend.position = "none"
+    legend.position = "right"
   )
+
+# Mostrar el gráfico
+print(grafico2)
+
+# 4. Guardar el gráfico
+ggsave("Graficos-tablas/grafico2.png", plot = grafico2, width = 10, height = 6, dpi = 300)
 ```
 Haciendo esta misma gráfica que busca eliminar la confusión pero con una distribución más granular de la variable de consumo de bebidas azucaradas sin ponderación.  
 
@@ -628,29 +727,42 @@ df_grafico_ponderado <- df_analisis %>%
                                         "2-3 veces/sem",
                                         "4-6 veces/sem",
                                         "Diario (1)",
-                                        "Diario (2+)"))
+                                        "Diario (2+)")),
+    # Crear grupo de edad
+    grupo_edad = case_when(
+      edad >= 18 & edad <= 29 ~ "18-29",
+      edad >= 30 & edad <= 44 ~ "30-44",
+      edad >= 45 & edad <= 59 ~ "45-59",
+      edad >= 60 ~ "60+",
+      TRUE ~ NA_character_
+    )
   )
 
 # 2. Cálculo de Prevalencias usando el FEX_C 
 summary_ponderado <- df_grafico_ponderado %>%
   group_by(grupo_edad, frecuencia_full) %>%
   summarise(
-    # weighted.mean usa el peso FEX_C para expandir a la población real
     prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
     .groups = "drop"
   )
 
-# 3. Graficando
-ggplot(summary_con_ic, aes(x = frecuencia_full, y = prevalencia, fill = frecuencia_full)) +
+summary_con_ic <- df_grafico_ponderado %>%
+  group_by(grupo_edad, frecuencia_full) %>%
+  summarise(
+    n_muestral = n(),
+    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
+    se = sqrt((prevalencia * (1 - prevalencia)) / n_muestral),
+    lim_inf = pmax(prevalencia - (1.96 * se), 0),
+    lim_sup = prevalencia + (1.96 * se),
+    .groups = "drop"
+  )
+
+
+# 3. Gráfica
+grafico3 <- ggplot(summary_con_ic, aes(x = frecuencia_full, y = prevalencia, fill = frecuencia_full)) +
   geom_col(alpha = 0.8) + 
-  
-  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), 
-                width = 0.2,    
-                color = "black", 
-                linewidth = 0.7) + # <--- AQUÍ ESTÁ EL CAMBIO (antes era size)
-  
+  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), width = 0.2, color = "black", linewidth = 0.7) +
   facet_wrap(~grupo_edad, scales = "free_y") +
-  
   labs(
     title = "Prevalencia Poblacional con Intervalos de Confianza (95%)",
     subtitle = "Estimación ponderada (FEX_C) con margen de error",
@@ -659,25 +771,23 @@ ggplot(summary_con_ic, aes(x = frecuencia_full, y = prevalencia, fill = frecuenc
     caption = "Fuente: Cálculos propios (DANE 2023). Bigotes indican IC 95%."
   ) +
   scale_y_continuous(labels = scales::percent) +
-  scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+  scale_fill_manual(values = pal) +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    legend.position = "none"
+    legend.position = "right"
   )
+
+# Mostrar el gráfico
+print(grafico3)
+
+ggsave("Graficos-tablas/prevalencia_poblacional.png", 
+       plot = grafico3, 
+       width = 10, 
+       height = 6, 
+       dpi = 300)
+
 ```
-
-
--   Estandarizar nombres (mayúsculas/acentos) en intro4 e intro5: en este paso ajustamos los nombres de departamento y municipio para mejorar la presentación de los datos de aquí en adelante. Y también se hace un proceso de estandarización usando clean:names() de janitor.
-
-### 2.2) Análisis univariado sistemático
-
-Antes de cruzar variables debe producir una comprensión clara de cada variable crítica teniendo en cuenta su distribución, categorías relevantes, patrones básicos se observan, cómo se comporta según el factor de expansión (si aplica)
-
-Para cada variable relevante incluya:
-
-• Tablas de frecuencia o estadísticas descriptivas, según su tipo.
-
 ```{r}
 # Calculamos los indicadores globales ponderados
 tabla_indicadores_globales <- df_analisis %>%
@@ -720,8 +830,207 @@ tabla_indicadores_globales <- df_analisis %>%
 print(tabla_indicadores_globales)
 ```
 
+### 2.2) Análisis univariado sistemático
 
-• Uno o dos gráficos univariados pertinentes como histogramas, gráficos de barras, boxplots simples, diagramas de densidad. Este análisis sirve como la base conceptual del proyecto: sin esta revisión, cualquier cruce posterior puede ser engañoso o incorrecto.
+De la base df_final se obtiene la base df_analisis, filtrada para adultos mayores de 18 años. Esta base contiene 172.538 observaciones con variables de distintos tipos: numéricas, factores y caracteres. Incluye identificadores como directorio, secuencia_p y orden, sin valores faltantes ni categorías especiales.
+
+En cuanto a hábitos de consumo, la variable consume_azucar no presenta NA, mientras que frecuencia_azucar tiene 63.494 valores faltantes. Las variables de salud, que constituyen la variable dependiente del análisis, como cronica_12m y cronica_binaria, no presentan NA, aunque cronica_num registra 27.297 outliers. Entre las variables sociodemográficas, que se utilizarán como controles, sexo y parentesco no tienen NA; edad contiene 56 categorías especiales y 25 outliers; nivel_educativo presenta 9.781 NA; ingreso_pc tiene 14.907 outliers, y cod_depto cuenta con 3.905 categorías especiales.
+
+Revisión de outliers y valores faltantes: Se identificaron outliers en Fex e ingreso_pc. Fex se mantuvo sin cambios por ser la variable de expansión, mientras que los valores extremos de ingreso_pc tampoco se corrigieron, ya que el valor máximo (250 millones) se considera válido. Respecto a los valores faltantes, los NA en nivel_educativo corresponden principalmente a menores de 5 años y se mantuvieron, al igual que los de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron utilizando la mediana por municipio. 
+
+```{r}
+#//////// Se revisa la base 
+
+# 1. Detectar categorías especiales
+
+categorias_especiales <- c(
+  "No sabe", "No responde", "Ns/Nr",
+  "ns", "nr", "sin dato", "no aplica",
+  98, 99, 999, 9999
+)
+
+# 2. Función auxiliar para detectar outliers (método IQR)
+detectar_outliers <- function(x) {
+  if (!is.numeric(x)) return(NA_integer_)
+  q1 <- quantile(x, 0.25, na.rm = TRUE)
+  q3 <- quantile(x, 0.75, na.rm = TRUE)
+  iqr <- q3 - q1
+  sum(x < (q1 - 1.5*iqr) | x > (q3 + 1.5*iqr), na.rm = TRUE)
+}
+
+# 3. Tabla resumen completa
+tabla_resumen <- df_analisis %>%
+  summarise(
+    variable = names(.),
+    tipo = map_chr(., ~ class(.x)[1]),
+    n_observaciones = map_int(., length),
+    n_na = map_int(., ~ sum(is.na(.x))),
+    categorias_especiales = map_int(., ~ sum(.x %in% categorias_especiales)),
+    mezcla_ns_nr = map_lgl(., ~ any(.x %in% categorias_especiales) & !all(.x %in% categorias_especiales)),
+    outliers = map_int(., detectar_outliers)
+  ) %>%
+  unnest(cols = c(tipo, n_observaciones, n_na, categorias_especiales, mezcla_ns_nr, outliers))
+
+tabla_resumen
+```
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(kableExtra)
+library(paletteer)
+
+# Variables Categóricas (Pocas opciones: Hombre/Mujer, Sí/No, Niveles)
+vars_categoricas <- list(
+  "Habitos" = c("consume_azucar", "frecuencia_azucar"),
+  "Sociodemograficas" = c("sexo", "parentesco", "nivel_educativo"),
+  "Salud" = c("cronica_12m", "cronica_binaria")
+)
+
+# Variables Numéricas (Rango amplio: Edad, Dinero)
+vars_numericas <- list(
+  "Sociodemograficas" = c("edad", "ingreso_pc")
+)
+
+# Función para Variables Categóricas
+analisis_univariado_cat <- function(varname, df) {
+  
+  # --- Tabla sin ponderar
+  tabla_simple <- df %>%
+    filter(!is.na(!!sym(varname))) %>% 
+    count(!!sym(varname)) %>%
+    mutate(
+      n_sinpond = as.numeric(n),
+      porc_sinpond = round(100 * n / sum(n), 1)
+    ) %>%
+    select(!!sym(varname), n_sinpond, porc_sinpond)
+  
+  # --- Tabla ponderada
+  tabla_pond <- df %>%
+    filter(!is.na(!!sym(varname))) %>%
+    group_by(!!sym(varname)) %>%
+    summarise(n_pond = sum(fex, na.rm = TRUE), .groups = "drop") %>%
+    mutate(porc_pond = round(100 * n_pond / sum(n_pond), 1))
+  
+  # --- Combinar
+  tabla_comp <- tabla_simple %>%
+    full_join(tabla_pond, by = varname) %>%
+    arrange(!!sym(varname))
+  
+  # --- Guardar tabla HTML
+  color_header <- pal[25] 
+  
+  tabla_html <- tabla_comp %>%
+    kable(
+      "html",
+      caption = paste0("<b style='color:", color_header, "; font-size:16px;'>Variable Categórica: ", varname, "</b>"),
+      col.names = c(varname, "N (sin pond.)", "% (sin pond.)", "N (pond.)", "% (pond.)"),
+      digits = 1
+    ) %>%
+    add_header_above(c(" " = 1, "Sin ponderar" = 2, "Ponderado" = 2)) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"),
+                  position = "center") %>%
+    row_spec(0, bold = TRUE, color = "white", background = color_header)
+  
+  save_kable(tabla_html, paste0("Graficos-tablas/tabla_cat_", varname, ".html"))
+  
+  # --- Gráfico de Barras
+  tabla_grafico <- tabla_comp %>%
+    select(!!sym(varname), porc_sinpond, porc_pond) %>%
+    pivot_longer(cols = c(porc_sinpond, porc_pond),
+                 names_to = "tipo", values_to = "porc") %>%
+    mutate(tipo = ifelse(tipo == "porc_pond", "Ponderado", "Sin ponderar"))
+  
+  grafico <- ggplot(tabla_grafico, aes(x = factor(!!sym(varname)), y = porc, fill = tipo)) +
+    geom_col(position = "dodge", alpha = 0.9) +
+    geom_text(aes(label = paste0(porc, "%")),
+              position = position_dodge(width = 0.9), vjust = -0.4, size = 3.5) +
+    scale_fill_manual(values = c("Sin ponderar" = pal[10], "Ponderado" = pal[25])) +
+    labs(title = paste0("Distribución: ", varname), x = varname, y = "Porcentaje", fill = "Tipo") +
+    theme_minimal()
+  
+  ggsave(paste0("Graficos-tablas/grafico_cat_", varname, ".png"), plot = grafico, width = 10, height = 6)
+}
+
+# Función para Variables Numéricas
+analisis_univariado_cont <- function(varname, df) {
+  
+  # 1. Calcular Estadísticos Descriptivos
+  stats <- df %>%
+    filter(!is.na(!!sym(varname))) %>%
+    summarise(
+      Media_SP = mean(!!sym(varname)),
+      Mediana_SP = median(!!sym(varname)),
+      Min_SP = min(!!sym(varname)),
+      Max_SP = max(!!sym(varname)),
+      Media_Pond = weighted.mean(!!sym(varname), w = fex)
+    ) %>%
+    pivot_longer(cols = everything(), names_to = "Metrica", values_to = "Valor")
+  
+  # 2. Guardar Tabla de Estadísticos
+  color_header <- pal[25]
+  
+  tabla_html <- stats %>%
+    mutate(Valor = round(Valor, 2)) %>%
+    kable("html", caption = paste0("<b style='color:", color_header, "; font-size:16px;'>Variable Numérica: ", varname, "</b>")) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"), position = "center") %>%
+    row_spec(0, bold = TRUE, color = "white", background = color_header)
+  
+  save_kable(tabla_html, paste0("Graficos-tablas/tabla_num_", varname, ".html"))
+  
+  # 3. Gráfico de Densidad (Curva) comparativo
+  grafico <- ggplot(df, aes(x = !!sym(varname))) +
+    geom_density(aes(fill = "Sin ponderar"), alpha = 0.4) +
+    geom_density(aes(weight = fex, fill = "Ponderado"), alpha = 0.4) +
+    scale_fill_manual(name = "Tipo", values = c("Sin ponderar" = pal[10], "Ponderado" = pal[25])) +
+    labs(
+      title = paste0("Distribución (Densidad): ", varname),
+      subtitle = "Comparación de distribución ponderada vs muestral",
+      x = varname,
+      y = "Densidad"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "top")
+  
+  ggsave(paste0("Graficos-tablas/grafico_num_", varname, ".png"), plot = grafico, width = 10, height = 6)
+}
+
+```
+
+```{r}
+
+# Histograma y Boxplot para variables numéricas
+graficos_adicionales_num <- function(varname, df) {
+
+  # --- Histograma
+  histo <- ggplot(df, aes(x=!!sym(varname))) +
+    geom_histogram(fill=pal[10], color="white", bins=30) +
+    labs(title=paste0("Histograma: ", varname), x=varname, y="Frecuencia") +
+    theme_minimal()
+  
+  ggsave(paste0("Graficos-tablas/hist_num_", varname, ".png"), plot=histo, width=10, height=6, dpi=300)
+  
+  # --- Boxplot
+  box <- ggplot(df, aes(x=factor(1), y=!!sym(varname))) +
+    geom_boxplot(fill=pal[15], outlier.color="red", outlier.size=1.5) +
+    labs(title=paste0("Boxplot: ", varname), x="", y=varname) +
+    theme_minimal()
+  
+  ggsave(paste0("Graficos-tablas/box_num_", varname, ".png"), plot=box, width=6, height=6, dpi=300)
+}
+
+# Aplicar solo a variables numéricas
+for(cat in names(vars_numericas)){
+  for(var in vars_numericas[[cat]]){
+    graficos_adicionales_num(var, df_analisis)
+  }
+}
+
+```
+
 
 ### 2.3) Análisis bivariado guiado por la pregunta
 
@@ -761,15 +1070,24 @@ tabla_cruce_fex <- df_analisis %>%
   select(consumo_agrupado, Estado_Salud, Poblacion_Format, Porcentaje_Format) %>%
   arrange(consumo_agrupado, desc(Estado_Salud))
 
-# 2. Visualizar la tabla en formato "Largo" (Detallada)
+# Guardar
+tabla_cruce_gt <- tabla_cruce_fex %>%
+  gt() %>%
+  tab_header(
+    title = "Distribución de Enfermedad Crónica por Consumo",
+    subtitle = "Análisis Ponderado (FEX)"
+  ) %>%
+  # Opcional: Añadir estilo básico
+  opt_row_striping() 
+
+# Guardamos el archivo HTML
+gtsave(tabla_cruce_gt, filename = "Graficos-tablas/tabla_cruce_larga.html")
+
+# 2. Visualizar la tabla en formato "Largo" 
 print(tabla_cruce_fex)
 
-# -------------------------------------------------------
-# OPCIÓN B: Formato "Ancho" (Tipo Matriz - Ideal para copiar a Excel/Word)
-# -------------------------------------------------------
 
-library(tidyr)
-
+# OPCIÓN B: Formato "Ancho" 
 tabla_matriz <- df_analisis %>%
   filter(!is.na(fex)) %>%
   group_by(consumo_agrupado) %>%
@@ -780,7 +1098,6 @@ tabla_matriz <- df_analisis %>%
     Total = sum(fex, na.rm = TRUE),
     Prevalencia_Enfermedad = (Pob_Enfermos / Total) * 100
   ) %>%
-  # Formato visual
   mutate(
     Pob_Sanos = format(round(Pob_Sanos, 0), big.mark = ","),
     Pob_Enfermos = format(round(Pob_Enfermos, 0), big.mark = ","),
@@ -788,8 +1105,18 @@ tabla_matriz <- df_analisis %>%
     Prevalencia_Enfermedad = paste0(round(Prevalencia_Enfermedad, 2), "%")
   )
 
-print("--- TABLA MATRIZ RESUMEN ---")
 print(tabla_matriz)
+
+# Guardar
+tabla_matriz_gt <- tabla_matriz %>%
+  gt() %>%
+  tab_header(
+    title = "Resumen de Prevalencia y Población",
+    subtitle = "Tabla Matriz Ponderada"
+  ) 
+
+# Guardamos el archivo HTML
+gtsave(tabla_matriz_gt, filename = "Graficos-tablas/tabla_matriz_resumen.html")
 ```
 
 Modelo multivariado: 
@@ -848,6 +1175,46 @@ resultados_or <- tidy(modelo_logistico, exponentiate = TRUE, conf.int = TRUE) %>
 
 # 5. Imprimir la tabla final
 print(resultados_or)
+
+# Guardar tabla
+tabla_modelo <- resultados_or %>%
+  gt() %>%
+  # Títulos
+  tab_header(
+    title = "Resultados del Modelo de Regresión Logística",
+    subtitle = "Odds Ratios (OR) ajustados por edad, sexo e ingreso"
+  ) %>%
+  # Renombrar columnas
+  cols_label(
+    term = "Variable",
+    estimate = "Odds Ratio (OR)",
+    std.error = "Error Est.",
+    conf.low = "IC 95% Inf.",
+    conf.high = "IC 95% Sup.",
+    p.value = "Valor p"
+  ) %>%
+  fmt_number(
+    columns = c(estimate, std.error, conf.low, conf.high, p.value),
+    decimals = 3
+  ) %>%
+  # Estilo
+  tab_options(
+    table.background.color = "white",
+    table.font.color = "black",
+    table.border.top.color = "black",
+    table.border.bottom.color = "black",
+    heading.border.bottom.color = "black",
+    column_labels.border.bottom.color = "black",
+    table_body.border.bottom.color = "black",
+    table_body.hlines.color = "gray90"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  )
+
+# 2. Guardar en la carpeta
+gtsave(tabla_modelo, filename = "Graficos-tablas/resultados_modelo.html")
 ```
 
 
