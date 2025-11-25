@@ -26,10 +26,12 @@ pacman::p_load(
   scales,       # Formato de escalas en ggplot2 (ej. porcentajes, comas).
   openxlsx,     # Guardar excel
   writexl,      # Guardar excel
+  here,
   haven,
   kableExtra,
   paletteer,
   ggplot2,
+  ggthemes,
   broom,
   stringr,
   gt,
@@ -166,7 +168,7 @@ Además, al contar con información territorial por departamento y municipio, es
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
 #getwd()
-ruta <- "C:/1. MECA/2025/EXPLORACIÓN Y VISUALIZACIÓN DE DATOS- Miguel Andres Garzón/Datos_proyecto2"
+ruta <- here("data")
 
 # Base 1: Salud
 salud <- read_dta(file.path(ruta, "Salud.dta"))
@@ -280,7 +282,7 @@ print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
 
 ```{r}
 #//////// Se unen las 5 bases
-df_final <- df_salud %>%
+df_final_c <- df_salud %>%
   # Join 1: Nivel Persona con Persona (Match perfecto)
   left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
   
@@ -292,6 +294,9 @@ df_final <- df_salud %>%
   
   # Join 4: Nivel Persona con Vivienda (Muchos a Uno)
   left_join(df_vivienda,        by = c("DIRECTORIO"))
+
+# Copia del df original
+df_final <- df_final_c 
 
 # revisión general y de los mising
 skimr::skim(df_final)
@@ -379,7 +384,6 @@ sort(unique(df_final$cod_depto))
 
 ```
 
-
 ```{r}
 # //////// Cambiar el tipo a las variables 
 df_final <- df_final %>%
@@ -451,7 +455,6 @@ ggsave("Graficos-tablas/histograma_ingreso_pc.png", plot = hist_plot, width = 8,
 
 ```
 
-
 Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con los de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron con la mediana por municipio
 
 ```{r}
@@ -477,6 +480,8 @@ df_final <- df_final %>%
                              median(ingreso_pc, na.rm = TRUE),
                              ingreso_pc)) %>%
   ungroup()
+
+
 ```
 
 Excluyendo de los análisis los menores de edad:
@@ -494,10 +499,10 @@ df_analisis <- df_final %>%
   filter(edad >= 18) 
 
 # Verificación final:
-skim(df_analisis)
+skim(df_analisis$nivel_educativo)
 ```
 
-Ahora teniendo la base de datos limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas: 
+Ahora teniendo la base de datos limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas:
 
 ```{r}
 # 1. PREPARACIÓN DE DATOS
@@ -587,277 +592,13 @@ for (nombre in names(lista_tablas)) {
 }
 ```
 
-
-Sacando la edad promedio de las personas por categoría de edad para empezar a construir la lógica de causalidad reversa usando la ponderación del fex: 
-
-```{r}
-# TABLA 1: Variable Agrupada (4 Categorías - Semáforo)
-tabla_agrupada <- df_analisis %>%
-  filter(!is.na(fex)) %>%
-  group_by(consumo_agrupado) %>%
-  summarise(
-    n_muestra = n(),
-    Poblacion_Estimada = round(sum(fex, na.rm = TRUE), 0),
-    Edad_Promedio = round(weighted.mean(edad, w = fex, na.rm = TRUE), 1),
-    Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
-  )
-
-print(tabla_agrupada)
-
-# TABLA 2: Variable Detallada (7 Categorías - Escala Completa)
-tabla_detallada <- df_analisis %>%
-  filter(!is.na(fex)) %>%
-  group_by(consumo_detallado) %>%
-  summarise(
-    n_muestra = n(),
-    Poblacion_Estimada = round(sum(fex, na.rm = TRUE), 0),
-    Edad_Promedio = round(weighted.mean(edad, w = fex, na.rm = TRUE), 1),
-    Prevalencia_Cronica = round(weighted.mean(cronica_binaria, w = fex, na.rm = TRUE) * 100, 2)
-  )
-
-print(tabla_detallada)
-```
-
-```{r}
-# =========================================
-# 0. Paquetes necesarios
-# =========================================
-library(dplyr)
-library(ggplot2)
-library(scales)
-
-# Paleta personalizada (ya la tenías)
-pal <- paletteer::paletteer_c("ggthemes::Blue-Teal", 30)
-
-# =========================================
-# 1. Preparación de la variable de 4 categorías
-# =========================================
-df_grafico_4cat <- df_analisis %>%
-  filter(!is.na(fex)) %>% 
-  mutate(
-    # Paso A: Unificar frecuencia numérica (0 para no consumidores)
-    freq_num_tmp = case_when(
-      consume_azucar == 2 ~ 0,
-      TRUE ~ as.numeric(as.character(frecuencia_azucar))
-    ),
-    
-    # Paso B: Agrupar en las 4 categorías del "Semáforo"
-    nivel_consumo = case_when(
-      freq_num_tmp == 0 ~ "No consume",
-      freq_num_tmp %in% c(5, 6) ~ "Ocasional (< 2/sem)",
-      freq_num_tmp %in% c(3, 4) ~ "Frecuente (2-6/sem)",
-      freq_num_tmp %in% c(1, 2) ~ "Diario (Todos los días)"
-    ),
-    
-    # Paso C: Ordenar el factor para la gráfica
-    nivel_consumo = factor(nivel_consumo, 
-                           levels = c("No consume", 
-                                      "Ocasional (< 2/sem)", 
-                                      "Frecuente (2-6/sem)", 
-                                      "Diario (Todos los días)")),
-    
-    # Re-codificar cronica_binaria a 0/1
-    cronica_binaria_num = case_when(
-      cronica_binaria %in% c("Sí", "si", "SI", 1) ~ 1,
-      cronica_binaria %in% c("No", "no", "NO", 0) ~ 0,
-      TRUE ~ NA_real_
-    )
-  ) %>%
-  # Crear la variable de grupo edad
-  mutate(
-    grupo_edad = case_when(
-      edad >= 18 & edad <= 29 ~ "18-29",
-      edad >= 30 & edad <= 44 ~ "30-44",
-      edad >= 45 & edad <= 59 ~ "45-59",
-      edad >= 60 ~ "60+",
-      TRUE ~ NA_character_
-    )
-  )
-
-# =========================================
-# 2. Cálculo de Estadísticas Ponderadas
-# =========================================
-summary_4cat_ponderado <- df_grafico_4cat %>%
-  group_by(grupo_edad, nivel_consumo) %>%
-  summarise(
-    n_muestral = n(),
-    
-    # Prevalencia ponderada
-    prevalencia = weighted.mean(cronica_binaria_num, w = fex, na.rm = TRUE),
-    
-    # Error estándar aproximado
-    se = sqrt((prevalencia * (1 - prevalencia)) / n_muestral),
-    
-    # Intervalo de Confianza 95%
-    lim_inf = pmax(prevalencia - 1.96 * se, 0),
-    lim_sup = pmin(prevalencia + 1.96 * se, 1),
-    
-    .groups = "drop"
-  )
-
-# =========================================
-# 3. Visualización
-# =========================================
-grafico2 <- ggplot(summary_4cat_ponderado, aes(x = nivel_consumo, y = prevalencia, fill = nivel_consumo)) +
-  geom_col(alpha = 0.8) +
-  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), width = 0.2, color = "black", linewidth = 0.7) +
-  facet_wrap(~grupo_edad, scales = "free_y") +
-  labs(
-    title = "Prevalencia por Nivel de Consumo (4 Categorías)",
-    subtitle = "Estimación ponderada (FEX) con intervalos de confianza del 95%",
-    y = "Prevalencia Estimada (%)",
-    x = "Nivel de Consumo Agrupado",
-    fill = "Nivel de Consumo",
-    caption = "Fuente: Cálculos propios."
-  ) +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  scale_fill_manual(values = pal[c(5, 10, 20, 30)]) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    legend.position = "right"
-  )
-
-# Mostrar gráfico
-print(grafico2)
-
-# =========================================
-# 4. Guardar gráfico
-# =========================================
-ggsave("Graficos-tablas/grafico2.png", plot = grafico2, width = 10, height = 6, dpi = 300)
-
-```
-Haciendo esta misma gráfica que busca eliminar la confusión pero con una distribución más granular de la variable de consumo de bebidas azucaradas sin ponderación.  
-
-```{r}
-
-# 1. Preparación de datos para gráfico ponderado
-df_grafico_ponderado <- df_analisis %>%
-  filter(!is.na(fex)) %>% 
-  mutate(
-    # Recodificación de Frecuencia 
-    freq_num = case_when(
-      consume_azucar == 2 ~ 0,
-      TRUE ~ as.numeric(frecuencia_azucar)
-    ),
-    frecuencia_full = factor(freq_num,
-                             levels = c(0, 6, 5, 4, 3, 2, 1),
-                             labels = c("No consume",
-                                        "< 1 vez/sem",
-                                        "1 vez/sem",
-                                        "2-3 veces/sem",
-                                        "4-6 veces/sem",
-                                        "Diario (1)",
-                                        "Diario (2+)")),
-    # Crear grupo de edad
-    grupo_edad = case_when(
-      edad >= 18 & edad <= 29 ~ "18-29",
-      edad >= 30 & edad <= 44 ~ "30-44",
-      edad >= 45 & edad <= 59 ~ "45-59",
-      edad >= 60 ~ "60+",
-      TRUE ~ NA_character_
-    )
-  )
-
-# 2. Cálculo de Prevalencias usando el FEX_C 
-summary_ponderado <- df_grafico_ponderado %>%
-  group_by(grupo_edad, frecuencia_full) %>%
-  summarise(
-    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-summary_con_ic <- df_grafico_ponderado %>%
-  group_by(grupo_edad, frecuencia_full) %>%
-  summarise(
-    n_muestral = n(),
-    prevalencia = weighted.mean(cronica_binaria, w = fex, na.rm = TRUE),
-    se = sqrt((prevalencia * (1 - prevalencia)) / n_muestral),
-    lim_inf = pmax(prevalencia - (1.96 * se), 0),
-    lim_sup = prevalencia + (1.96 * se),
-    .groups = "drop"
-  )
-
-
-# 3. Gráfica
-grafico3 <- ggplot(summary_con_ic, aes(x = frecuencia_full, y = prevalencia, fill = frecuencia_full)) +
-  geom_col(alpha = 0.8) + 
-  geom_errorbar(aes(ymin = lim_inf, ymax = lim_sup), width = 0.2, color = "black", linewidth = 0.7) +
-  facet_wrap(~grupo_edad, scales = "free_y") +
-  labs(
-    title = "Prevalencia Poblacional con Intervalos de Confianza (95%)",
-    subtitle = "Estimación ponderada (FEX_C) con margen de error",
-    y = "Prevalencia Estimada (%)",
-    x = "Intensidad de Consumo",
-    caption = "Fuente: Cálculos propios (DANE 2023). Bigotes indican IC 95%."
-  ) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_manual(values = pal) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    legend.position = "right"
-  )
-
-# Mostrar el gráfico
-print(grafico3)
-
-ggsave("Graficos-tablas/prevalencia_poblacional.png", 
-       plot = grafico3, 
-       width = 10, 
-       height = 6, 
-       dpi = 300)
-
-```
-```{r}
-# Calculamos los indicadores globales ponderados
-tabla_indicadores_globales <- df_analisis %>%
-  filter(!is.na(fex)) %>% # Seguridad: eliminar pesos perdidos
-  summarise(
-    # --- 1. Totales Poblacionales ---
-    # Sumamos el factor de expansión para ver el universo total
-    Poblacion_Total_Est = sum(fex),
-    
-    # --- 2. Indicadores de Consumo de Bebidas Azucaradas ---
-    # Numerador: Suma de FEX donde consume_azucar es 1 (Sí)
-    Poblacion_Consume_Est = sum(fex[consume_azucar == 1]),
-    # Proporción: Promedio ponderado de la condición (TRUE/FALSE)
-    Prop_Consumo_Porc = weighted.mean(consume_azucar == 1, w = fex) * 100,
-    
-    # --- 3. Indicadores de Enfermedad Crónica ---
-    # Numerador: Suma de FEX donde cronica_binaria es 1
-    Poblacion_Enferma_Est = sum(fex[cronica_binaria == 1]),
-    # Proporción: Promedio ponderado
-    Prop_Enfermedad_Porc = weighted.mean(cronica_binaria, w = fex) * 100
-  ) %>%
-  
-  # Formato para facilitar la lectura (Redondear y pasar a Millones si quieres)
-  mutate(
-    Poblacion_Total_Millones = round(Poblacion_Total_Est / 1e6, 2),
-    Poblacion_Consume_Millones = round(Poblacion_Consume_Est / 1e6, 2),
-    Poblacion_Enferma_Millones = round(Poblacion_Enferma_Est / 1e6, 2),
-    
-    # Redondear porcentajes
-    Prop_Consumo_Porc = round(Prop_Consumo_Porc, 2),
-    Prop_Enfermedad_Porc = round(Prop_Enfermedad_Porc, 2)
-  ) %>%
-  
-  # Seleccionamos las columnas finales para el reporte
-  select(Poblacion_Total_Millones, 
-         Poblacion_Consume_Millones, Prop_Consumo_Porc,
-         Poblacion_Enferma_Millones, Prop_Enfermedad_Porc)
-
-# Imprimimos la tabla
-print(tabla_indicadores_globales)
-```
-
 ### 2.2) Análisis univariado sistemático
 
 De la base df_final se obtiene la base df_analisis, filtrada para adultos mayores de 18 años. Esta base contiene 172.538 observaciones con variables de distintos tipos: numéricas, factores y caracteres. Incluye identificadores como directorio, secuencia_p y orden, sin valores faltantes ni categorías especiales.
 
-En cuanto a hábitos de consumo, la variable consume_azucar no presenta NA, mientras que frecuencia_azucar tiene 63.494 valores faltantes. Las variables de salud, que constituyen la variable dependiente del análisis, como cronica_12m y cronica_binaria, no presentan NA, aunque cronica_num registra 27.297 outliers. Entre las variables sociodemográficas, que se utilizarán como controles, sexo y parentesco no tienen NA; edad contiene 56 categorías especiales y 25 outliers; nivel_educativo presenta 9.781 NA; ingreso_pc tiene 14.907 outliers, y cod_depto cuenta con 3.905 categorías especiales.
+En cuanto a hábitos de consumo, la variable consume_azucar no presenta NA, mientras que frecuencia_azucar tiene 63.494 valores faltantes correspondientes a aquellas personas que respondieron de forma negativa en la pregunta de consumo de azucar. Las variables de salud, que constituyen la variable dependiente del análisis, como cronica_12m y cronica_binaria, no presentan NA, aunque cronica_num registra 27.297 outliers. Entre las variables sociodemográficas, que se utilizarán como controles, sexo y parentesco no tienen NA; edad contiene 56 categorías especiales y 25 outliers; nivel_educativo presenta 9.781 NA; ingreso_pc tiene 14.907 outliers, y cod_depto cuenta con 3.905 categorías especiales.
 
-Revisión de outliers y valores faltantes: Se identificaron outliers en Fex e ingreso_pc. Fex se mantuvo sin cambios por ser la variable de expansión, mientras que los valores extremos de ingreso_pc tampoco se corrigieron, ya que el valor máximo (250 millones) se considera válido. Respecto a los valores faltantes, los NA en nivel_educativo corresponden principalmente a menores de 5 años y se mantuvieron, al igual que los de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron utilizando la mediana por municipio. 
+Revisión de outliers y valores faltantes: Se identificaron outliers en Fex e ingreso_pc. Fex se mantuvo sin cambios por ser la variable de expansión, mientras que los valores extremos de ingreso_pc tampoco se corrigieron, ya que el valor máximo (250 millones) se considera válido. Respecto a los valores faltantes, los NA en nivel_educativo corresponden principalmente a menores de 5 años y se mantuvieron. Los NA en ingreso_pc se imputaron utilizando la mediana por municipio.
 
 ```{r}
 #//////// Se revisa la base 
@@ -1057,194 +798,371 @@ for(cat in names(vars_numericas)){
 
 ```
 
-
 ### 2.3) Análisis bivariado guiado por la pregunta
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
 
-Tabla de cruce entre X y Y
+#### Preparación de variables - bivariado
+
+Ajustando el dataset df_bivariado, corrigiendo los NAs de educación, ordenando los factores de consumo (para que el gráfico tenga sentido de menor a mayor) y creando una variable de edad categórica.
+
 ```{r}
-# 1. Generar la tabla cruzada ponderada
-tabla_cruce_fex <- df_analisis %>%
-  # Filtramos pesos perdidos para evitar errores
-  filter(!is.na(fex)) %>% 
-  
-  # Agrupamos por las dos variables de interés
-  group_by(consumo_agrupado, cronica_binaria) %>% 
-  
-  # Sumamos el FEX para obtener la población estimada en cada celda
-  summarise(
-    poblacion_est = sum(fex, na.rm = TRUE), 
-    .groups = "drop_last" # Mantenemos el grupo de consumo para calcular %
-  ) %>% 
-  
-  # Calculamos el porcentaje dentro de cada fila (Row Percentage)
+df_bivariado <- df_analisis %>%
   mutate(
-    total_grupo = sum(poblacion_est),
-    porcentaje = (poblacion_est / total_grupo) * 100
-  ) %>%
-  
-  # Mejoramos la etiqueta de la enfermedad para la presentación
-  mutate(
-    Estado_Salud = ifelse(cronica_binaria == 1, "Enfermo", "Sano"),
-    # Formato numérico limpio (miles y un decimal)
-    Poblacion_Format = format(round(poblacion_est, 0), big.mark = ","),
-    Porcentaje_Format = paste0(round(porcentaje, 2), "%")
-  ) %>%
-  
-  # Seleccionamos y ordenamos para mostrar
-  select(consumo_agrupado, Estado_Salud, Poblacion_Format, Porcentaje_Format) %>%
-  arrange(consumo_agrupado, desc(Estado_Salud))
+    # Manejo de NAs en Educación: 
+    nivel_educativo = fct_na_value_to_level(nivel_educativo, level = "Sin Información"),
+    
+    # Ordenamiento lógico de la variable de exposición para gráficas
+    consumo_agrupado = fct_relevel(consumo_agrupado, 
+                                   "No consume", 
+                                   "Ocasional (< 2/sem)", 
+                                   "Frecuente (2-6/sem)", 
+                                   "Diario (Todos los días)"),
+    # Ajustando la codificación de sexo
+    sexo = factor(sexo, 
+                  levels = c(1, 2), 
+                  labels = c("Hombre", "Mujer")),
+    
+    # Creación de grupos etarios
+    grupo_edad = case_when(
+      edad < 30 ~ "Jóvenes (18-29)",
+      edad >= 30 & edad < 40 ~ "Adultos Jóvenes (30-39)",
+      edad >= 40 & edad < 50 ~ "Adultez Media (40-49)",
+      edad >= 50 & edad < 60 ~ "Madurez (50-59)",
+      edad >= 60 & edad < 70 ~ "Adulto mayor (60-69)",
+      edad >= 70 ~ "Vejez extrema (70+)"
+    ),
+    # Ordenamos los niveles para los gráficops
+    grupo_edad = factor(grupo_edad, levels = c("Jóvenes (18-29)", 
+                                               "Adultos Jóvenes (30-39)", 
+                                               "Adultez Media (40-49)", 
+                                               "Madurez (50-59)", 
+                                               "Adulto mayor (60-69)", 
+                                               "Vejez extrema (70+)"))
+  )
 
-# Guardar
-tabla_cruce_gt <- tabla_cruce_fex %>%
-  gt() %>%
-  tab_header(
-    title = "Distribución de Enfermedad Crónica por Consumo",
-    subtitle = "Análisis Ponderado (FEX)"
-  ) %>%
-  # Opcional: Añadir estilo básico
-  opt_row_striping() 
+```
 
-# Guardamos el archivo HTML
-gtsave(tabla_cruce_gt, filename = "Graficos-tablas/tabla_cruce_larga.html")
+#### Tablas de prevalencias
 
-# 2. Visualizar la tabla en formato "Largo" 
-print(tabla_cruce_fex)
+Generando las tablas resumen numéricas que alimentarán los gráficos.
 
-
-# OPCIÓN B: Formato "Ancho" 
-tabla_matriz <- df_analisis %>%
-  filter(!is.na(fex)) %>%
+```{r}
+# A) Tabla Global
+df_grafico_global <- df_bivariado %>%
   group_by(consumo_agrupado) %>%
   summarise(
-    # Calculamos columnas separadas sumando el FEX condicionalmente
-    Pob_Sanos = sum(fex[cronica_binaria == 0], na.rm = TRUE),
-    Pob_Enfermos = sum(fex[cronica_binaria == 1], na.rm = TRUE),
-    Total = sum(fex, na.rm = TRUE),
-    Prevalencia_Enfermedad = (Pob_Enfermos / Total) * 100
-  ) %>%
-  mutate(
-    Pob_Sanos = format(round(Pob_Sanos, 0), big.mark = ","),
-    Pob_Enfermos = format(round(Pob_Enfermos, 0), big.mark = ","),
-    Total = format(round(Total, 0), big.mark = ","),
-    Prevalencia_Enfermedad = paste0(round(Prevalencia_Enfermedad, 2), "%")
+    poblacion_total = sum(fex, na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
+    prevalencia = poblacion_enferma / poblacion_total,
+    preva_100 = (poblacion_enferma / poblacion_total) * 100,
+    pob_total_mill = round(poblacion_total / 1000000, 2),
+    .groups = "drop"
   )
 
-print(tabla_matriz)
+# B) Tabla Estratificada por Edad
+df_grafico_estratificado <- df_bivariado %>%
+  group_by(grupo_edad, consumo_agrupado) %>%
+  summarise(
+    poblacion_total = sum(fex, na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
+    prevalencia = poblacion_enferma / poblacion_total,
+    preva_100 = (poblacion_enferma / poblacion_total) * 100,
+    .groups = "drop"
+  )
 
-# Guardar
-tabla_matriz_gt <- tabla_matriz %>%
-  gt() %>%
-  tab_header(
-    title = "Resumen de Prevalencia y Población",
-    subtitle = "Tabla Matriz Ponderada"
-  ) 
+# C) Tabla Estratificada por Sexo y Edad (Para Heatmap y Líneas)
+df_grafico_sexo <- df_bivariado %>%
+  group_by(sexo, grupo_edad, consumo_agrupado) %>%
+  summarise(
+    poblacion_total = sum(fex, na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
+    prevalencia = poblacion_enferma / poblacion_total,
+    preva_100 = (poblacion_enferma / poblacion_total) * 100,
+    .groups = "drop"
+  ) %>%
+  mutate(grupo_edad_rev = fct_rev(grupo_edad)) 
 
-# Guardamos el archivo HTML
-gtsave(tabla_matriz_gt, filename = "Graficos-tablas/tabla_matriz_resumen.html")
 ```
 
-Modelo multivariado: 
+Ahora exportamos las tablas al formato seleccionado: 
 
 ```{r}
-# 1. Re-nivelar la variable para que la referencia sea "Ocasional"
-# Esto es CRÍTICO para aislar el efecto de causalidad reversa
-df_modelo <- df_analisis %>%
-  mutate(
-    consumo_relevel = relevel(consumo_agrupado, ref = "Ocasional (< 2/sem)")
-  )
+# Función auxiliar para formatear y guardar
+exportar_html <- function(data, titulo, nombre_archivo) {
+  data %>%
+    mutate(across(where(is.numeric), \(x) round(x, 2))) %>% 
+    kbl(caption = titulo, format = "html", align = 'c') %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                  full_width = F, position = "center") %>%
+    row_spec(0, bold = T, color = "white", background = "#2c3e50") %>% 
+    save_kable(file = file.path("Graficos-tablas", paste0(nombre_archivo, ".html")))
+}
 
-# Verificamos que "Ocasional" sea ahora el primero
-levels(df_modelo$consumo_relevel)
+# Generar las 3 tablas clave
+exportar_html(df_grafico_global, "Prevalencia Global Ponderada", "Bivariado_prevalencia_global")
+exportar_html(df_grafico_estratificado, "Prevalencia por Edad", "Bivariado_prevalencia_edad")
+exportar_html(df_grafico_sexo, "Prevalencia por Sexo y Edad", "Bivariado_prevalencia_edad_sexo")
 ```
+
+#### Visualizaciones del bivariado
+
 ```{r}
-# 1. Limpieza de datos (Casos Completos)
-# Eliminamos filas con NA en fex, ingreso o variables del modelo
-df_modelo_final <- df_modelo %>%
-  filter(
-    !is.na(fex),                 # Obligatorio para el diseño
-    !is.na(ingreso_pc),          # Variable de control económica
-    !is.na(consumo_relevel),     # Exposición
-    !is.na(cronica_binaria),     # Desenlace
-    !is.na(edad),                # Control
-    !is.na(sexo),                # Control
-    !is.na(nivel_educativo)      # Control
+# ==============================================================================
+# Visualización bivariada 
+
+library(ggplot2)
+library(ggthemes)
+library(scales)
+library(paletteer)
+
+# Definiendo la paleta
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+# --- GRÁFICO 1: GLOBAL (PARADOJA) ---
+p_global <- ggplot(df_grafico_global, aes(x = consumo_agrupado, y = prevalencia)) +
+  geom_line(group = 1, linetype = "dashed", color = "grey50") +
+  geom_point(size = 5, color = "#4E79A7") + 
+  geom_text(aes(label = paste0(round(preva_100, 1), "%")), 
+            vjust = -1.5, size = 4, fontface = "bold", color = "#2c3e50") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 0.30)) + 
+  labs(
+    title = "Prevalencia de enf. crónica según intensidad de consumo",
+    subtitle = "Análisis global: paradoja de causalidad reversa",
+    x = NULL, y = "Prevalencia (%)",
+    caption = "Fuente: ECV 2023. Población expandida."
+  ) +
+  theme_few() + 
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+
+# --- GRÁFICO 2: ESTRATIFICADO POR EDAD (CURVA J) ---
+p_estratificado <- ggplot(df_grafico_estratificado, 
+                          aes(x = consumo_agrupado, y = prevalencia, color = grupo_edad)) +
+  geom_line(aes(group = grupo_edad), size = 1, alpha = 0.8) +
+  geom_point(size = 3) +
+  facet_wrap(~grupo_edad, scales = "free_y") + 
+  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  scale_color_paletteer_d("ggthemes::Tableau_10") +
+  labs(
+    title = "Prevalencia según intensidad de consumo por grupo etario",
+    subtitle = "Controlando por edad aparecen patrones de riesgo (Curva J)",
+    x = "Frecuencia de consumo", y = "Prevalencia (%)", color = "Grupo de edad"
+  ) +
+  theme_few() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none",
+        strip.text = element_text(face = "bold"))
+
+# --- GRÁFICO 3: MAPA DE CALOR SEXO ---
+df_heatmap_sexo <- df_grafico_sexo %>% mutate(grupo_edad = fct_rev(grupo_edad))
+
+p_heatmap_sexo <- ggplot(df_heatmap_sexo, aes(x = consumo_agrupado, y = grupo_edad, fill = prevalencia)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  facet_wrap(~sexo) + 
+  geom_text(aes(label = paste0(round(preva_100, 1), "%")), 
+            color = ifelse(df_heatmap_sexo$preva_100 > 25, "white", "#2c3e50"), 
+            size = 3, fontface = "bold") +
+  scale_fill_gradientn(colors = paleta_teal, labels = percent_format()) +
+  labs(
+    title = "Mapa de calor: riesgo de enfermedad crónica por Sexo",
+    subtitle = "Efecto del sesgo de supervivencia",
+    x = NULL, y = NULL, fill = "Prevalencia"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold", color = "#006064"),
+    panel.grid = element_blank()
   )
 
-# 2. Definición del Diseño Muestral
-# Ahora sí, con la base limpia, no debería salir error
-diseno_encuesta <- svydesign(
-  ids = ~1, 
-  weights = ~fex, 
-  data = df_modelo_final
-)
-
-# 3. Ajuste del Modelo Logístico Ponderado
-# Agregamos 'ingreso_pc' a la fórmula para controlar por capacidad económica
-modelo_logistico <- svyglm(
-  cronica_binaria ~ consumo_relevel + edad + sexo + nivel_educativo + ingreso_pc, 
-  design = diseno_encuesta,
-  family = quasibinomial(link = "logit") 
-)
-
-# 4. Extraer Resultados (OR e Intervalos de Confianza)
-resultados_or <- tidy(modelo_logistico, exponentiate = TRUE, conf.int = TRUE) %>%
-  select(term, estimate, std.error, conf.low, conf.high, p.value) %>%
-  mutate(
-    # Limpieza de nombres para facilitar la lectura
-    term = str_replace(term, "consumo_relevel", "Comparado con Ocasional: "),
-    term = str_remove(term, "nivel_educativo")
-  ) %>%
-  # Filtramos para ver las variables principales primero
-  filter(str_detect(term, "Comparado con|edad|sexo|ingreso"))
-
-# 5. Imprimir la tabla final
-print(resultados_or)
-
-# Guardar tabla
-tabla_modelo <- resultados_or %>%
-  gt() %>%
-  # Títulos
-  tab_header(
-    title = "Resultados del Modelo de Regresión Logística",
-    subtitle = "Odds Ratios (OR) ajustados por edad, sexo e ingreso"
-  ) %>%
-  # Renombrar columnas
-  cols_label(
-    term = "Variable",
-    estimate = "Odds Ratio (OR)",
-    std.error = "Error Est.",
-    conf.low = "IC 95% Inf.",
-    conf.high = "IC 95% Sup.",
-    p.value = "Valor p"
-  ) %>%
-  fmt_number(
-    columns = c(estimate, std.error, conf.low, conf.high, p.value),
-    decimals = 3
-  ) %>%
-  # Estilo
-  tab_options(
-    table.background.color = "white",
-    table.font.color = "black",
-    table.border.top.color = "black",
-    table.border.bottom.color = "black",
-    heading.border.bottom.color = "black",
-    column_labels.border.bottom.color = "black",
-    table_body.border.bottom.color = "black",
-    table_body.hlines.color = "gray90"
-  ) %>%
-  tab_style(
-    style = cell_text(weight = "bold"),
-    locations = cells_column_labels()
+# --- GRÁFICO 4: TENDENCIAS POR SEXO ---
+p_lineas_sexo <- ggplot(df_grafico_sexo, 
+                        aes(x = consumo_agrupado, y = prevalencia, color = sexo, group = sexo)) +
+  geom_line(size = 1.2, alpha = 0.9) +
+  geom_point(size = 3) +
+  
+  # Haciendo el faceting por grupo de edad
+  facet_wrap(~grupo_edad, nrow = 1) + 
+  
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  
+  # Paleta seleccionada para el proyecto
+  scale_color_manual(values = c("Hombre" = "#2c3e50", "Mujer" = "#26C6DA")) +
+  
+  labs(
+    title = "Tendencias por sexo y grupo etario",
+    subtitle = "Comparación de prevalencia entre hombres y mujeres",
+    x = NULL,
+    y = "Prevalencia (%)",
+    color = "Sexo"
+  ) +
+  theme_few() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
   )
 
-# 2. Guardar en la carpeta
-gtsave(tabla_modelo, filename = "Graficos-tablas/resultados_modelo.html")
+# Guardar Gráficos
+ggsave("Graficos-tablas/bivariado_graph_global.png", p_global, width = 8, height = 6)
+ggsave("Graficos-tablas/bivariado_graph_edad.png", p_estratificado, width = 10, height = 6)
+ggsave("Graficos-tablas/bivariado_heatmap_graph_edad_sexo.png", p_heatmap_sexo, width = 12, height = 7)
+ggsave("Graficos-tablas/bivaariado_lineas_sexo_edad.png", p_lineas_sexo, width = 12, height = 6)
+
+# Mostrar en RMarkdown
+print(p_global)
+print(p_estratificado)
+print(p_heatmap_sexo)
+print(p_lineas_sexo)
 ```
+
+Análisis global (paradoja de la causalidad reversa): al examinar la relación cruda entre el consumo de bebidas azucaradas y la enfermedad crónica a nivel nacional, se observa una asociación negativa aparente: la prevalencia de enfermedad es drásticamente mayor en el grupo que "No consume" (24.0%) comparado con quienes consumen "Diariamente" (8.6%). Desde una perspectiva epidemiológica y económica, este hallazgo no sugiere un efecto protector del azúcar, sino que evidencia un fuerte sesgo de selección por causalidad inversa (fenómeno sick-quitter). Es altamente probable que el diagnóstico de patologías como diabetes o hipertensión actúe como el determinante exógeno que fuerza a los individuos a modificar su dieta, concentrando así a la población con peor salud en la categoría de "No consumidores" y distorsionando la estimación del riesgo real.
+
+Estratificación por grupo etario (heterogeneidad del efecto):  Al controlar por decenios de edad, se despeja parcialmente esta distorsión. Si bien el efecto sick-quitter persiste transversalmente (los "No consumidores" siempre son los más enfermos en todos los grupos etarios), el comportamiento dentro de la población consumidora revela patrones divergentes. En los grupos económicamente activos (18 a 59 años), emerge una tendencia no lineal en forma de "J": tras excluir a los abstemios, se observa un gradiente positivo donde la prevalencia repunta al transitar de un consumo "Frecuente" a uno "Diario", sugiriendo una asociación dosis-respuesta oculta en el análisis global. Por el contrario, en la vejez (60+ años), la tendencia se torna linealmente negativa, comportamiento atribuible a la restricción médica estricta y a un marcado sesgo de supervivencia, donde los individuos más vulnerables fallecen prematuramente, disminuyendo artificialmente la prevalencia observada en los consumidores longevos.
+
+Dinámica de género y sesgo de supervivencia diferencial: El análisis de las trayectorias vitales añade una capa de complejidad mediante la brecha de género. Aunque en etapas tempranas (18-29 años) las curvas de prevalencia se solapan, con la edad se produce una separación progresiva donde las mujeres reportan tasas sistemáticamente más altas, atribuible a una mayor frecuencia de diagnóstico y uso de servicios de salud frente al sub-registro masculino. Críticamente, al llegar a la tercera edad, se evidencia una atrición diferencial: mientras las mujeres mantienen el patrón de riesgo en "J" hasta la vejez extrema, los hombres pierden dicha señal a partir de los 60 años. Esto sugiere que los hombres con alto consumo y predisposición a enfermar sufren una mortalidad prematura selectiva, dejando en la muestra de ancianos a un subgrupo de "sobrevivientes resilientes" que sesgan la asociación hacia la nulidad, fenómeno menos acentuado en mujeres debido a su mayor esperanza de vida con morbilidad.
+
+Conclusión del análisis descriptivo: en síntesis, la evidencia descriptiva bivariada sugiere que sí existe una asociación positiva estructural entre la intensidad del consumo y la enfermedad crónica, pero esta relación es condicional a la edad y al sexo. De esta manera, el análisis bivariado puede ser insuficiente debido a la contaminación por causalidad reversa y sesgos de selección y supervivencia. Por consiguiente, es importasnte usar modelos multivariados que aíslen el riesgo biológico real, controlando por la confusión demográfica y ajustando la categoría de referencia para mitigar el sesgo de endogeneidad introducido por el cambio de comportamiento post-diagnóstico.
+
+
+#### Prueba estadística bivariada
+
+Usamos el paquete survey para poder montar la prueba de hipótesis usando el factor de expansión de la ECV.
+
+```{r}
+# --- CHUNK 5: Test de Independencia con Diseño Muestral ---
+library(survey)
+
+# Definiendo el diseño muestral
+diseno_muestral <- svydesign(ids = ~1, weights = ~fex, data = df_bivariado)
+
+# Tabla cruzada ponderada 
+print("--- Tabla de Contingencia Poblacional (Millones de personas) ---")
+svytable(~consumo_agrupado + cronica_binaria, design = diseno_muestral)
+
+# Test de Chi-Cuadrado de Rao-Scott (Corrección para encuestas complejas)
+test_survey <- svychisq(~consumo_agrupado + cronica_binaria, design = diseno_muestral)
+
+print("--- Resultado Chi-Cuadrado Ajustado (Rao-Scott) ---")
+print(test_survey)
+```
+
+#### Multivariado
+
+```{r}
+library(survey)
+library(broom)
+
+# Configuración de Referencias:
+# Referencia: Frecuente (Control) | Jóvenes | Hombres
+df_model <- df_bivariado %>%
+  mutate(
+    consumo_agrupado = relevel(consumo_agrupado, ref = "Frecuente (2-6/sem)"),
+    grupo_edad = relevel(grupo_edad, ref = "Jóvenes (18-29)"),
+    sexo = relevel(sexo, ref = "Hombre")
+  )
+
+# Diseño Muestral
+diseno_muestral <- svydesign(ids = ~1, weights = ~fex, data = df_model)
+
+# Ajuste del Modelo (Interacción Triple)
+modelo_interaccion <- svyglm(
+  cronica_num ~ consumo_agrupado * grupo_edad * sexo, 
+  design = diseno_muestral,
+  family = quasibinomial()
+)
+
+# Tabla de Resultados Tidy
+tabla_resultados <- tidy(modelo_interaccion, exponentiate = TRUE, conf.int = TRUE) %>%
+  select(term, estimate, conf.low, conf.high, p.value) %>%
+  mutate(
+    across(c(estimate, conf.low, conf.high), \(x) round(x, 2)),
+    p_valor_formato = ifelse(p.value < 0.001, "< 0.001", as.character(round(p.value, 3)))
+  ) %>%
+  # Limpieza de nombres de variables
+  mutate(term = gsub("consumo_agrupado", "Consumo: ", term),
+         term = gsub("grupo_edad", "Edad: ", term),
+         term = gsub("sexoMujer", "Mujer", term),
+         term = gsub(":", " x ", term))
+```
+
+Al establecer el 'Consumo Frecuente' como categoría basal —un grupo teóricamente expuesto pero sin el comportamiento extremo de restricción médica—, el modelo multivariado desveló dos mecanismos opuestos que operan simultáneamente en la población. Por un lado, se aisló el Efecto Biológico: la intensificación del hábito hacia un consumo 'Diario' incrementa significativamente la probabilidad de enfermedad crónica (OR = 1.61), confirmando la hipótesis de riesgo por exceso de exposición. Por otro lado, se dimensionó la magnitud de la Causalidad Inversa (Efecto Sick-Quitter): paradójicamente, la reducción del consumo a niveles 'Ocasionales' (OR = 2.25) o la abstinencia total (OR = 3.44) se asocian con los mayores niveles de riesgo. Este gradiente inverso no indica que dejar el azúcar enferme, sino que la enfermedad fuerza a los pacientes a migrar hacia categorías de bajo consumo, concentrando artificialmente la patología en los grupos de menor exposición aparente. El modelo confirma así que la relación no es lineal, sino en forma de 'J', donde tanto el exceso (por causa) como la carencia (por consecuencia) marcan los puntos altos de prevalencia.
+
+#### Forest plot de la regresión
+
+```{r}
+# Preparación de datos para el Forest Plot
+# Clasificamos los coeficientes según el mecanismo económico/epidemiológico
+df_forest_conceptual <- tabla_resultados %>%
+  filter(term == "Mujer" | grepl("Consumo", term)) %>%
+  filter(!grepl("Edad", term)) %>% # Filtramos interacciones de edad para limpieza visual
+  mutate(
+    Mecanismo = case_when(
+      grepl("Diario", term) & !grepl("Mujer", term) ~ "1. Efecto tratamiento (margen intensivo)",
+      (grepl("No consume", term) | grepl("Ocasional", term)) & !grepl("Mujer", term) ~ "2. Sesgo de endogeneidad (causalidad reversa)",
+      term == "Mujer" ~ "3. Control de heterogeneidad (sexo)",
+      TRUE ~ "Otros"
+    ),
+    term_clean = case_when(
+      grepl("Diario", term) ~ "Consumo diario (intensificación)",
+      grepl("Ocasional", term) ~ "Consumo ocasional (reducción)",
+      grepl("No consume", term) ~ "No consume (abstinencia)",
+      term == "Mujer" ~ "Ser mujer (vs hombre)",
+      TRUE ~ term
+    )
+  ) %>%
+  filter(Mecanismo != "Otros") %>%
+  filter(!grepl("Mujer", term) | term == "Mujer")
+
+# B) Generación del Gráfico
+p_forest_concept <- ggplot(df_forest_conceptual, 
+                           aes(x = estimate, y = reorder(term_clean, estimate), color = Mecanismo)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "grey40") +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.3, size = 0.8) +
+  geom_point(size = 4) +
+  geom_text(aes(label = paste0("OR: ", estimate)), vjust = -1.5, size = 3.5, fontface = "bold") +
+  
+  # Facetas con títulos centrados arriba
+  facet_wrap(~Mecanismo, ncol = 1, scales = "free_y") +
+  
+  scale_x_log10() +
+  scale_color_manual(values = c(
+    "1. Efecto tratamiento (margen intensivo)" = "#D62728", 
+    "2. Sesgo de endogeneidad (causalidad reversa)" = "#FF7F0E", 
+    "3. Control de heterogeneidad (sexo)" = "#1F77B4" 
+  )) +
+  
+  labs(
+    title = "Identificación del efecto del consumo de azúcar",
+    subtitle = "Odds Ratios usando como referencia el consumo Frecuente",
+    x = "Odds Ratio", y = NULL,
+    caption = "Nota: Estimación svyglm ponderada. Panel 1 muestra efecto estructural. Panel 2 muestra selección adversa."
+  ) +
+  theme_bw() + 
+  theme(
+    axis.text.y = element_text(face = "bold", size = 11),
+    strip.text = element_text(face = "bold", size = 11, color = "white", hjust = 0.5), # Centrado
+    strip.background = element_rect(fill = "#2c3e50"),
+    legend.position = "none", 
+    panel.grid.minor = element_blank(),
+    panel.spacing = unit(1, "lines")
+  )
+
+print(p_forest_concept)
+ggsave("Graficos-tablas/bivariado_forest_conceptual_multivariado.png", p_forest_concept, width = 11, height = 8)
+```
+
+La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pesos muestrales, diseñado para aislar la relación de asociación entre consumo y salud. Se utiliza el "consumo Frecuente" como grupo de control para descomponer el efecto en tres componentes:
+
+1.  **Panel superior (efecto real del consumo sobre la salud):** Identifica la relación positiva real. Al incrementar la exposición en el margen intensivo (pasar de Frecuente a Diario), la probabilidad de enfermedad aumenta un 61% (OR: 1.61), lo que sugiere una relación estructural negativa entre el consumo intensivo de este bien y la salud medida por la aparición de enfermedades crónicas en los últimos 12 meses.
+
+2.  **Panel medio (causalidad reversa):** captura la fuente de endogeneidad del modelo. Los coeficientes de "Abstinencia" (OR: 3.44) y "Reducción" (OR: 2.25) no reflejan causalidad, sino un **mecanismo de selección adversa (sesgo de selección en salud)**: los agentes con menor salud (enfermos) autoseleccionan niveles de consumo bajos o nulos como respuesta a su condición. Si no se separa este grupo,el estimador del efecto del azúcar estaría sesgado hacia cero o sería negativo.
+
+3.  **Panel inferior (heterogeneidad observada):** Controlando por covariables, se puede identificar que las mujeres tienen una propensión sistemáticamente mayor al reporte de la condición, *ceteris paribus*.
 
 
 
 # Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados
 
 Revisión de Power BI
+

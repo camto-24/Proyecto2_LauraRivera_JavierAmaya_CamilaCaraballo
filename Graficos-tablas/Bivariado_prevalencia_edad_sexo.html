@@ -281,35 +281,499 @@ border: 0;
 </head>
 <body>
 <table class="table table-striped table-hover table-condensed" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
-<caption><b style="color:#317197FF; font-size:16px;">Variable Categórica: cronica_12m</b></caption>
+<caption>Prevalencia por Sexo y Edad</caption>
  <thead>
-<tr>
-<th style="empty-cells: hide;border-bottom:hidden;" colspan="1"></th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">Sin ponderar</div></th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">Ponderado</div></th>
-</tr>
   <tr>
-   <th style="text-align:left;font-weight: bold;color: white !important;background-color: rgba(49, 113, 151, 255) !important;"> cronica_12m </th>
-   <th style="text-align:right;font-weight: bold;color: white !important;background-color: rgba(49, 113, 151, 255) !important;"> N (sin pond.) </th>
-   <th style="text-align:right;font-weight: bold;color: white !important;background-color: rgba(49, 113, 151, 255) !important;"> % (sin pond.) </th>
-   <th style="text-align:right;font-weight: bold;color: white !important;background-color: rgba(49, 113, 151, 255) !important;"> N (pond.) </th>
-   <th style="text-align:right;font-weight: bold;color: white !important;background-color: rgba(49, 113, 151, 255) !important;"> % (pond.) </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> sexo </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> grupo_edad </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> consumo_agrupado </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> poblacion_total </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> poblacion_enferma </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> prevalencia </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> preva_100 </th>
+   <th style="text-align:center;font-weight: bold;color: white !important;background-color: rgba(44, 62, 80, 255) !important;"> grupo_edad_rev </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> 1 </td>
-   <td style="text-align:right;"> 27297 </td>
-   <td style="text-align:right;"> 15.8 </td>
-   <td style="text-align:right;"> 5750851 </td>
-   <td style="text-align:right;"> 15.2 </td>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 872492.13 </td>
+   <td style="text-align:center;"> 49311.04 </td>
+   <td style="text-align:center;"> 0.06 </td>
+   <td style="text-align:center;"> 5.65 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> 2 </td>
-   <td style="text-align:right;"> 145241 </td>
-   <td style="text-align:right;"> 84.2 </td>
-   <td style="text-align:right;"> 32142130 </td>
-   <td style="text-align:right;"> 84.8 </td>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 1065153.78 </td>
+   <td style="text-align:center;"> 40107.95 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 3.77 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 1814439.18 </td>
+   <td style="text-align:center;"> 31077.34 </td>
+   <td style="text-align:center;"> 0.02 </td>
+   <td style="text-align:center;"> 1.71 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 1037202.21 </td>
+   <td style="text-align:center;"> 28284.21 </td>
+   <td style="text-align:center;"> 0.03 </td>
+   <td style="text-align:center;"> 2.73 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 839638.11 </td>
+   <td style="text-align:center;"> 65538.84 </td>
+   <td style="text-align:center;"> 0.08 </td>
+   <td style="text-align:center;"> 7.81 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 927462.20 </td>
+   <td style="text-align:center;"> 54197.62 </td>
+   <td style="text-align:center;"> 0.06 </td>
+   <td style="text-align:center;"> 5.84 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 1293091.44 </td>
+   <td style="text-align:center;"> 51935.71 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 4.02 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 661300.72 </td>
+   <td style="text-align:center;"> 29223.38 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 4.42 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 959680.12 </td>
+   <td style="text-align:center;"> 129647.52 </td>
+   <td style="text-align:center;"> 0.14 </td>
+   <td style="text-align:center;"> 13.51 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 900350.18 </td>
+   <td style="text-align:center;"> 76725.95 </td>
+   <td style="text-align:center;"> 0.09 </td>
+   <td style="text-align:center;"> 8.52 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 975894.93 </td>
+   <td style="text-align:center;"> 71123.38 </td>
+   <td style="text-align:center;"> 0.07 </td>
+   <td style="text-align:center;"> 7.29 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 470296.18 </td>
+   <td style="text-align:center;"> 28109.13 </td>
+   <td style="text-align:center;"> 0.06 </td>
+   <td style="text-align:center;"> 5.98 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1045755.50 </td>
+   <td style="text-align:center;"> 211448.28 </td>
+   <td style="text-align:center;"> 0.20 </td>
+   <td style="text-align:center;"> 20.22 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 677755.48 </td>
+   <td style="text-align:center;"> 99485.27 </td>
+   <td style="text-align:center;"> 0.15 </td>
+   <td style="text-align:center;"> 14.68 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 640423.09 </td>
+   <td style="text-align:center;"> 75349.49 </td>
+   <td style="text-align:center;"> 0.12 </td>
+   <td style="text-align:center;"> 11.77 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 268755.85 </td>
+   <td style="text-align:center;"> 35188.72 </td>
+   <td style="text-align:center;"> 0.13 </td>
+   <td style="text-align:center;"> 13.09 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 987212.65 </td>
+   <td style="text-align:center;"> 294025.50 </td>
+   <td style="text-align:center;"> 0.30 </td>
+   <td style="text-align:center;"> 29.78 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 482213.98 </td>
+   <td style="text-align:center;"> 113444.52 </td>
+   <td style="text-align:center;"> 0.24 </td>
+   <td style="text-align:center;"> 23.53 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 341309.45 </td>
+   <td style="text-align:center;"> 68614.72 </td>
+   <td style="text-align:center;"> 0.20 </td>
+   <td style="text-align:center;"> 20.10 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 160990.80 </td>
+   <td style="text-align:center;"> 28732.71 </td>
+   <td style="text-align:center;"> 0.18 </td>
+   <td style="text-align:center;"> 17.85 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1024829.81 </td>
+   <td style="text-align:center;"> 462916.99 </td>
+   <td style="text-align:center;"> 0.45 </td>
+   <td style="text-align:center;"> 45.17 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 304841.32 </td>
+   <td style="text-align:center;"> 111056.83 </td>
+   <td style="text-align:center;"> 0.36 </td>
+   <td style="text-align:center;"> 36.43 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 160329.61 </td>
+   <td style="text-align:center;"> 57389.58 </td>
+   <td style="text-align:center;"> 0.36 </td>
+   <td style="text-align:center;"> 35.79 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Hombre </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 84732.59 </td>
+   <td style="text-align:center;"> 25543.03 </td>
+   <td style="text-align:center;"> 0.30 </td>
+   <td style="text-align:center;"> 30.15 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1123866.01 </td>
+   <td style="text-align:center;"> 95051.14 </td>
+   <td style="text-align:center;"> 0.08 </td>
+   <td style="text-align:center;"> 8.46 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 1336660.82 </td>
+   <td style="text-align:center;"> 50046.88 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 3.74 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 1760765.35 </td>
+   <td style="text-align:center;"> 65157.14 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 3.70 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 817123.12 </td>
+   <td style="text-align:center;"> 34321.40 </td>
+   <td style="text-align:center;"> 0.04 </td>
+   <td style="text-align:center;"> 4.20 </td>
+   <td style="text-align:center;"> Jóvenes (18-29) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1224097.86 </td>
+   <td style="text-align:center;"> 112550.96 </td>
+   <td style="text-align:center;"> 0.09 </td>
+   <td style="text-align:center;"> 9.19 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 1155139.37 </td>
+   <td style="text-align:center;"> 91108.22 </td>
+   <td style="text-align:center;"> 0.08 </td>
+   <td style="text-align:center;"> 7.89 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 1162814.17 </td>
+   <td style="text-align:center;"> 77585.65 </td>
+   <td style="text-align:center;"> 0.07 </td>
+   <td style="text-align:center;"> 6.67 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 509501.16 </td>
+   <td style="text-align:center;"> 39999.15 </td>
+   <td style="text-align:center;"> 0.08 </td>
+   <td style="text-align:center;"> 7.85 </td>
+   <td style="text-align:center;"> Adultos Jóvenes (30-39) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1336327.07 </td>
+   <td style="text-align:center;"> 242176.58 </td>
+   <td style="text-align:center;"> 0.18 </td>
+   <td style="text-align:center;"> 18.12 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 956006.25 </td>
+   <td style="text-align:center;"> 138511.14 </td>
+   <td style="text-align:center;"> 0.14 </td>
+   <td style="text-align:center;"> 14.49 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 838249.73 </td>
+   <td style="text-align:center;"> 79923.10 </td>
+   <td style="text-align:center;"> 0.10 </td>
+   <td style="text-align:center;"> 9.53 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 357333.40 </td>
+   <td style="text-align:center;"> 43835.52 </td>
+   <td style="text-align:center;"> 0.12 </td>
+   <td style="text-align:center;"> 12.27 </td>
+   <td style="text-align:center;"> Adultez Media (40-49) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1442715.88 </td>
+   <td style="text-align:center;"> 399534.84 </td>
+   <td style="text-align:center;"> 0.28 </td>
+   <td style="text-align:center;"> 27.69 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 799248.42 </td>
+   <td style="text-align:center;"> 187026.04 </td>
+   <td style="text-align:center;"> 0.23 </td>
+   <td style="text-align:center;"> 23.40 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 546568.34 </td>
+   <td style="text-align:center;"> 103249.85 </td>
+   <td style="text-align:center;"> 0.19 </td>
+   <td style="text-align:center;"> 18.89 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 223460.68 </td>
+   <td style="text-align:center;"> 48691.09 </td>
+   <td style="text-align:center;"> 0.22 </td>
+   <td style="text-align:center;"> 21.79 </td>
+   <td style="text-align:center;"> Madurez (50-59) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1359219.40 </td>
+   <td style="text-align:center;"> 521074.86 </td>
+   <td style="text-align:center;"> 0.38 </td>
+   <td style="text-align:center;"> 38.34 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 528467.03 </td>
+   <td style="text-align:center;"> 155623.61 </td>
+   <td style="text-align:center;"> 0.29 </td>
+   <td style="text-align:center;"> 29.45 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 304230.99 </td>
+   <td style="text-align:center;"> 78797.14 </td>
+   <td style="text-align:center;"> 0.26 </td>
+   <td style="text-align:center;"> 25.90 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 134230.65 </td>
+   <td style="text-align:center;"> 41826.47 </td>
+   <td style="text-align:center;"> 0.31 </td>
+   <td style="text-align:center;"> 31.16 </td>
+   <td style="text-align:center;"> Adulto mayor (60-69) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> No consume </td>
+   <td style="text-align:center;"> 1419638.68 </td>
+   <td style="text-align:center;"> 683767.65 </td>
+   <td style="text-align:center;"> 0.48 </td>
+   <td style="text-align:center;"> 48.16 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Ocasional (&lt; 2/sem) </td>
+   <td style="text-align:center;"> 340101.54 </td>
+   <td style="text-align:center;"> 137667.85 </td>
+   <td style="text-align:center;"> 0.40 </td>
+   <td style="text-align:center;"> 40.48 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Frecuente (2-6/sem) </td>
+   <td style="text-align:center;"> 141576.82 </td>
+   <td style="text-align:center;"> 53354.22 </td>
+   <td style="text-align:center;"> 0.38 </td>
+   <td style="text-align:center;"> 37.69 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> Mujer </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
+   <td style="text-align:center;"> Diario (Todos los días) </td>
+   <td style="text-align:center;"> 79487.35 </td>
+   <td style="text-align:center;"> 31492.95 </td>
+   <td style="text-align:center;"> 0.40 </td>
+   <td style="text-align:center;"> 39.62 </td>
+   <td style="text-align:center;"> Vejez extrema (70+) </td>
   </tr>
 </tbody>
 </table>
