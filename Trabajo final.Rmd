@@ -49,7 +49,8 @@ pacman::p_load(
   haven,        # Lectura y escritura de formatos de Stata, SAS y SPSS.
   readxl,       # Lectura de archivos de Excel (.xls y .xlsx).
   stargazer,    # Creación de tablas de regresión con formato de publicación.
-  knitr         # Generación de reportes dinámicos.
+  knitr,         # Generación de reportes dinámicos.
+  writexl
 )
 ```
 
@@ -936,21 +937,26 @@ p_global <- ggplot(df_grafico_global, aes(x = consumo_agrupado, y = prevalencia)
   theme(axis.text.x = element_text(angle = 15, hjust = 1))
 
 # --- GRÁFICO 2: ESTRATIFICADO POR EDAD (CURVA J) ---
-p_estratificado <- ggplot(df_grafico_estratificado, 
+p_estratificado <- ggplot(df_grafico_estratificado,
                           aes(x = consumo_agrupado, y = prevalencia, color = grupo_edad)) +
-  geom_line(aes(group = grupo_edad), size = 1, alpha = 0.8) +
-  geom_point(size = 3) +
-  facet_wrap(~grupo_edad, scales = "free_y") + 
-  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  geom_line(aes(group = grupo_edad), linewidth = 1, alpha = 0.8) + 
+  geom_point(size = 3) + 
+  facet_wrap(~grupo_edad, scales = "free_y") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
   scale_color_paletteer_d("ggthemes::Tableau_10") +
   labs(
     title = "Prevalencia según intensidad de consumo por grupo etario",
     subtitle = "Controlando por edad aparecen patrones de riesgo (Curva J)",
-    x = "Frecuencia de consumo", y = "Prevalencia (%)", color = "Grupo de edad"
+    x = "Frecuencia de consumo", 
+    y = "Prevalencia (%)", 
+    color = "Grupo de edad"
   ) +
-  theme_few() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none",
-        strip.text = element_text(face = "bold"))
+  ggthemes::theme_few() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1), 
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 10) 
+  )
 
 # --- GRÁFICO 3: MAPA DE CALOR SEXO ---
 df_heatmap_sexo <- df_grafico_sexo %>% mutate(grupo_edad = fct_rev(grupo_edad))
@@ -1159,6 +1165,95 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 2.  **Panel medio (causalidad reversa):** captura la fuente de endogeneidad del modelo. Los coeficientes de "Abstinencia" (OR: 3.44) y "Reducción" (OR: 2.25) no reflejan causalidad, sino un **mecanismo de selección adversa (sesgo de selección en salud)**: los agentes con menor salud (enfermos) autoseleccionan niveles de consumo bajos o nulos como respuesta a su condición. Si no se separa este grupo,el estimador del efecto del azúcar estaría sesgado hacia cero o sería negativo.
 
 3.  **Panel inferior (heterogeneidad observada):** Controlando por covariables, se puede identificar que las mujeres tienen una propensión sistemáticamente mayor al reporte de la condición, *ceteris paribus*.
+
+
+## 2.4)Modelamiento de datos relacionales
+
+```{r}
+# Preparación de llaves y IDs
+df_modelo <- df_bivariado %>%
+  mutate(
+    # Llaves Únicas
+    id_hogar   = paste0(directorio, "-", secuencia_p),
+    id_persona = paste0(directorio, "-", secuencia_p, "-", orden),
+    
+    # Asegurar formato carácter para cruces
+    cod_mpio  = as.character(cod_mpio),
+    cod_depto = as.character(cod_depto)
+  )
+
+# Dimensión geográfica
+dim_geografia <- df_modelo %>%
+  select(cod_mpio, cod_depto) %>%
+  distinct() %>%
+  arrange(cod_depto, cod_mpio)
+
+# Dimensión hogar (Economía y Entorno)
+# Aquí va el ingreso_pc porque es dato de hogar
+dim_hogar <- df_modelo %>%
+  select(id_hogar, cod_mpio, ingreso_pc) %>% 
+  group_by(id_hogar) %>%
+  slice(1) %>%
+  ungroup()
+
+# Dimensión del consumo de bebidas azucaradas (variable de exposición en el analisis)
+dim_consumo <- df_modelo %>%
+  select(
+    consume_azucar,          # Si/No (Original)
+    frecuencia_azucar,       # 1-6 (Original)
+    freq_num,                # Numérico equivalente a si=1 y no=0
+    consumo_agrupado,        # Factor ordenado (Tu variable principal)
+    consumo_agrupado_txt,    # Texto
+    consumo_detallado        # Factor detallado
+  ) %>%
+  distinct() %>%
+  arrange(consumo_detallado) %>%
+  mutate(id_consumo = row_number())
+
+# Dimensión demográfica
+dim_demografia <- df_modelo %>%
+  select(
+    id_persona,
+    sexo,
+    grupo_edad,        
+    parentesco,
+    nivel_educativo,
+    # Incluimos las variables de desenlace en versión texto para filtros
+    cronica_binaria,   # "Sí"/"No"
+    cronica_12m        # "1"/"2"
+  )
+
+# Tabla de hechos
+fact_personas <- df_modelo %>%
+  # Traemos el id_consumo cruzando por TODAS las variables para ser precisos
+  left_join(dim_consumo, 
+            by = c("consume_azucar", "frecuencia_azucar", "freq_num", 
+                   "consumo_agrupado", "consumo_agrupado_txt", "consumo_detallado")) %>%
+  select(
+    # Llaves para relacionar (Foreign Keys)
+    id_persona,      # Relación 1:1 con Dim_Demografia
+    id_hogar,        # Relación N:1 con Dim_Hogar
+    id_consumo,      # Relación N:1 con Dim_Consumo
+    
+    # Variables Numéricas (Metrics)
+    fex,             # Factor de expansión (CRUCIAL)
+    edad,            # Edad exacta (para promedios)
+    cronica_num,     # 0/1 (Para calcular prevalencias)
+    freq_num         # Por si quieres calcular "Frecuencia promedio de consumo"
+  )
+
+
+# Exportando la tabla a excel para que la pueda tomar power BI
+lista_tablas_final <- list(
+  "Hechos_Personas" = fact_personas,
+  "Dim_Hogar"       = dim_hogar,
+  "Dim_Demografia"  = dim_demografia,
+  "Dim_Geografia"   = dim_geografia,
+  "Dim_Consumo"     = dim_consumo
+)
+
+write_xlsx(lista_tablas_final, "Data/Modelo_Datos_Completo.xlsx")
+```
 
 
 
