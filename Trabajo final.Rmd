@@ -1179,19 +1179,22 @@ df_modelo <- df_bivariado %>%
     
     # Asegurar formato carácter para cruces
     cod_mpio  = as.character(cod_mpio),
-    cod_depto = as.character(cod_depto)
+    cod_depto = as.character(cod_depto),
+    id_geografia = paste0(cod_depto, cod_mpio),
   )
 
 # Dimensión geográfica
 dim_geografia <- df_modelo %>%
-  select(cod_mpio, cod_depto) %>%
-  distinct() %>%
-  arrange(cod_depto, cod_mpio)
+  select(id_geografia, cod_depto, cod_mpio) %>%
+  distinct() %>% 
+  group_by(id_geografia) %>%
+  slice(1) %>%
+  ungroup()
 
 # Dimensión hogar (Economía y Entorno)
 # Aquí va el ingreso_pc porque es dato de hogar
 dim_hogar <- df_modelo %>%
-  select(id_hogar, cod_mpio, ingreso_pc) %>% 
+  select(id_hogar, id_geografia, ingreso_pc) %>% 
   group_by(id_hogar) %>%
   slice(1) %>%
   ungroup()
@@ -1236,7 +1239,7 @@ fact_personas <- df_modelo %>%
     id_consumo,      # Relación N:1 con Dim_Consumo
     
     # Variables Numéricas (Metrics)
-    fex,             # Factor de expansión (CRUCIAL)
+    fex,             # Factor de expansión 
     edad,            # Edad exacta (para promedios)
     cronica_num,     # 0/1 (Para calcular prevalencias)
     freq_num         # Por si quieres calcular "Frecuencia promedio de consumo"
