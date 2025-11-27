@@ -1471,7 +1471,7 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 
 3.  **Panel inferior (heterogeneidad observada):** Controlando por covariables, se puede identificar que las mujeres tienen una propensión sistemáticamente mayor al reporte de la condición, *ceteris paribus*.
 
-## 2.4)Modelamiento de datos relacionales
+## 2.4) Modelamiento de datos relacionales
 
 ```{r}
 # Preparación de llaves y IDs
