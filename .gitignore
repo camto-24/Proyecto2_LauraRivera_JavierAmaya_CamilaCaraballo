@@ -10,3 +10,4 @@ scripts/.stswp
 # archivos de datos
 *.csv
 *.dta
+.RDataTmp

@@ -166,6 +166,8 @@ Además, al contar con información territorial por departamento y municipio, es
 
 ### 2.1) Preparación y comprensión inicial de los datos
 
+#### 2.1.1) Carga de los datos y verificación de estructuras básicas
+
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
 #install.packages("here")
@@ -188,7 +190,7 @@ servicios <- read_dta(file.path(ruta, "Servicios del hogar.dta"))
 vivienda <- read_dta(file.path(ruta, "Datos de la vivienda.dta"))
 
 # Revisión de las bases
-#str(salud)        # tipo de variables
+#str(salud)       
 ```
 
 ```{r}
@@ -285,27 +287,27 @@ print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
 ```{r}
 #//////// Se unen las 5 bases
 df_final_c <- df_salud %>%
-  # Join 1: Nivel Persona con Persona (Match perfecto)
+  # Join 1: Nivel Persona con Persona (uno a uno)
   left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
   
-  # Join 2: Nivel Persona con Persona (Match perfecto)
+  # Join 2: Nivel Persona con Persona (uno a uno)
   left_join(df_educacion,       by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
   
-  # Join 3: Nivel Persona con Hogar (Muchos a Uno)
+  # Join 3: Nivel Persona con Hogar (muchos a Uno)
   left_join(df_servicios,       by = c("DIRECTORIO", "SECUENCIA_P")) %>%
   
-  # Join 4: Nivel Persona con Vivienda (Muchos a Uno)
+  # Join 4: Nivel Persona con Vivienda (muchos a Uno)
   left_join(df_vivienda,        by = c("DIRECTORIO"))
 
 # Copia del df original
 df_final <- df_final_c 
 
-# revisión general y de los mising
+# revisión general y de los missing
 skimr::skim(df_final)
 
 ```
 
-La base fue cargada correctamente y contiene 240.212 observaciones y 14 variables, tal como se observa en el resumen general generado por skim(). La estructura también se verificó: el conjunto tiene 12 variables numéricas y 2 variables de tipo carácter. Ahora se realizará un cambio a los nombres de las variables:
+Renombrando las variables para dar mayor claridad al análisis:
 
 ```{r}
 #//////// Renombramiento y limpieza final de variables
@@ -344,104 +346,179 @@ df_final <- df_final %>%
 skimr::skim(df_final)
 ```
 
+#### 2.1.2) Revisión de la codificación
 
+Se realiza una revisión de la codificación usando la documentación de la ECV para el año 2023.
+
+***¿Sus variables numéricas son realmente numéricas?***
+
+VARIABLES NUMERICAS: Las variables que son verdaderamente numéricas teniendo en cuenta las definiciones de la ECV-2023 son:
+
+-   Edad
+
+-   Ingreso per capita
 
 ```{r}
-# //////// Cambiar el tipo a las variables 
+summary(df_final$edad)
+summary(df_final$ingreso_pc)
+summary(df_final$fex)
+```
+
+```{r}
+hist(df_final$edad)
+hist(log(df_final$ingreso_pc))
+hist(log(df_final$fex))
+
+class(df_final$edad)
+class(df_final$ingreso_pc)
+class(df_final$fex)
+```
+
+VARIABLES CATEGÓRICAS: - Directorio - Secuencia_p - orden - Sexo - Parentesco - Nivel educativo más alto alcanzado - ordinal - Diagnóstico de enfermedad crónica - Consumo de bebidas azucaradas - Frecuencia de consumo de bebidas azucaradas - ordinales - Departamento - Municipio.
+
+```{r}
+# //////// Redefinimos las variables que son categóricas por su naturaleza según la ECV
 df_final <- df_final %>%
   mutate(
+    
+    # Se asignan como caracter para poder operar las variables
     directorio = as.character(directorio),
     secuencia_p = as.character(secuencia_p),
     orden = as.character(orden),
+    cod_mpio          = as.character(cod_mpio), 
+    cod_depto         = as.character(cod_depto),
+    
+    # se asignan como factores
     sexo              = factor(sexo),
-    consume_azucar    = factor(consume_azucar),
-    frecuencia_azucar = factor(frecuencia_azucar),
-    cronica_12m       = factor(cronica_12m),
     parentesco        = factor(parentesco),
     nivel_educativo   = factor(nivel_educativo),
-    cod_mpio          = factor(cod_mpio)
+    cronica_12m       = factor(cronica_12m),
+    consume_azucar    = factor(consume_azucar),
+    frecuencia_azucar = factor(frecuencia_azucar)
+
+    
   )
 summary(df_final)
 ```
 
-Revisión de outliers estadísticamente: Se identificaron valores atípicos en las variables Fex e ingreso_pc. La variable Fex se mantiene sin modificaciones, ya que es la variable de expansión. En cuanto a ingreso_pc, se revisaron los valores extremos, pero no se realizaron correcciones, dado que el valor máximo corresponde a 250 millones y se considera válido
+**¿Las categorías están completas y correctamente etiquetadas?** **¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?**
+
 
 ```{r}
-# Se revisan cuantiles de las dos variables que tienen outliers
-quantile(df_final$fex, probs = c(0.95,0.99,0.999), na.rm = TRUE)
-quantile(df_final$ingreso_pc, probs = c(0.95,0.99,0.999), na.rm = TRUE)
 
-# Se revisan estadísticas de las dos variables que tienen outliers
-summary(df_final$fex)
-summary(df_final$ingreso_pc)
+# AJUSTE VARIABLES CATEGÓRICAS
 
-# Se grafica el outliers de ingreso
+df_final <- df_final %>%
+  mutate(
+    # VARIABLES DEPENDIENTE E INDEPENDIENTE
+    # Variable Dependiente: Diagnóstico de enfermedad crónica (P1930)
+    cronica_12m = factor(cronica_12m,
+                         levels = c(1, 2),
+                         labels = c("Sí", "No")),
+    # Variable Independiente: Consumo de bebidas azucaradas (P1707)
+    consume_azucar = factor(consume_azucar,
+                            levels = c(1, 2),
+                            labels = c("Sí", "No")),
+    # Variable Independiente: Frecuencia de consumo de bebidas azucaradas (P1707S1)
+    frecuencia_azucar = factor(frecuencia_azucar,
+                               levels = 1:6,
+                               labels = c("Todos los días (≥2 veces)", 
+                                          "Todos los días (1 vez)", 
+                                          "4 a 6 veces/semana", 
+                                          "2 a 3 veces/semana", 
+                                          "Una vez/semana", 
+                                          "Menos de 1 vez/semana")),
+    
+    # VARIABLES DE CONTROL
+    # sexo ya ajustada
+    # Parentesco (P6051)
+    parentesco = factor(parentesco,
+                        levels = 1:14,
+                        labels = c("Jefe/a del hogar", "Pareja/Cónyuge/Compañero/a", "Hijo/a/Hijastro/a", 
+                                   "Nieto/a", "Padre/Madre/Padrastro/Madrastra", "Suegro/a", 
+                                   "Hermano/a/Hermanastro/a", "Yerno/Nuera", "Otro/a pariente del/de la jefe/a", 
+                                   "Empleado/a del servicio doméstico", "Parientes del servicio doméstico", 
+                                   "Trabajador/a", "Pensionista", "Otro/a no pariente")),
+    # Nivel educativo más alto alcanzado (P8587)
+    nivel_educativo = factor(nivel_educativo,
+                             levels = 1:13,
+                             labels = c("Ninguno", "Preescolar", "Básica Primaria", 
+                                        "Básica Secundaria", "Media", 
+                                        "Técnico sin título", "Técnico con título", 
+                                        "Tecnológico sin título", "Tecnológico con título", 
+                                        "Universitario sin titulo", "Universitario con titulo", 
+                                        "Postgrado sin titulo", "Postgrado con titulo"))
+  )
 
-# Paleta azul–teal
-pal <- paletteer::paletteer_c("ggthemes::Blue-Teal", 30)
-
-# Calcular límites de outliers
-Q1 <- quantile(df_final$ingreso_pc, 0.25, na.rm = TRUE)
-Q3 <- quantile(df_final$ingreso_pc, 0.75, na.rm = TRUE)
-IQR <- Q3 - Q1
-limite_superior <- Q3 + 1.5 * IQR
-
-# Histograma 
-hist_plot <- ggplot() +
-  # Valores normales
-  geom_histogram(
-    data = filter(df_final, ingreso_pc <= limite_superior),
-    aes(x = ingreso_pc),
-    fill = pal[15], color = "white", bins = 50
-  ) +
-  # Valores extremos
-  geom_histogram(
-    data = filter(df_final, ingreso_pc > limite_superior),
-    aes(x = ingreso_pc),
-    fill = "red", color = "white", bins = 50
-  ) +
-  scale_x_log10(labels = scales::comma) +
-  labs(
-    title = "Distribución del Ingreso per Cápita",
-    x = "Ingreso per cápita (log10)",
-    y = "Frecuencia"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-# Mostrar gráfico
-print(hist_plot)
-
-# Guardar el gráfico
-ggsave("Graficos-tablas/histograma_ingreso_pc.png", plot = hist_plot, width = 8, height = 6, dpi = 300)
+skimr::skim(df_final)
 
 ```
 
-Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con las variables de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron con la mediana por municipio
+***¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?***
+
+No existen por construcción de las preguntas y documentación de la ECV-DANE-2023
+
+
+
+***¿Cómo se comporta el factor de expansión?***
 
 ```{r}
-#//////// Revisando los NA de educación que deben ser los menores de 5 años
-# 1. Crear subconjunto solo con NAs en nivel educativo
+
+summary(df_final$fex)
+
+
+# 1. Tabla de datos de la población total
+resumen_poblacional <- df_final %>%
+  summarise(
+    n_muestra = n(),
+    poblacion_estimada = sum(fex, na.rm = TRUE),
+    peso_min = min(fex),
+    peso_max = max(fex),
+    cv_pesos = sd(fex) / mean(fex) * 100 # Coeficiente de Variación de los pesos
+  )
+
+print(resumen_poblacional)
+
+# Histograma con escala logarítmica del fex
+# Usamos escala logarítmica porque vimos que el rango es muy amplio (1.4 a 7353)
+grafico_distribucion_fex <- ggplot(df_final, aes(x = fex)) +
+  geom_histogram(bins = 100, fill = "#2C3E50", color = "white", alpha = 0.8) +
+  geom_vline(aes(xintercept = mean(fex)), color = "red", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median(fex)), color = "blue", linetype = "dotted", size = 1) +
+  scale_x_log10(labels = scales::comma) + 
+  labs(
+    title = "Distribución del factor de expansión (FEX)",
+    subtitle = "Escala logarítmica",
+    x = "Factor de expansión (personas representadas por encuestado)",
+    y = "Frecuencia (número de encuestados)",
+    caption = "Línea roja: media; línea azul: Mediana"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"))
+
+# Mostrar el gráfico
+print(grafico_distribucion_fex)
+
+```
+
+#### 2.1.3) Tratamiento de faltantes donde se registre cómo se manejan NA y categorías especiales
+
+```{r}
+skimr::skim(df_final)
+```
+En esta etapa de la limpieza observamos NAs en las variables del consumo de azucar, en nivel educativo y en ingreso per capita. Sin embargo revisando la documentación de la base de datos es posible que los NA de nivel educativo correspondan menores de edad que por construcción no responden la encuesta de educación. Y que los NA de las variables de consumo de azucar tengan un comportamiento también derivado de la construcción de la encuesta.  
+
+Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con las variables de consume_azucar y frecuencia_azucar. 
+
+```{r}
+skimr::skim(df_final$nivel_educativo)
+# Creamos un subconjunto solo con NAs en nivel educativo
 df_educacion_na <- df_final %>%
   filter(is.na(nivel_educativo))
-
-# 2. Verificación rápida: ¿Quiénes son estos individuos?
+# Verificamos la edad promedio
 summary(df_educacion_na$edad)
-
-#//////// Ahora revisamos la distribución según las diferentes edades
-
-# 3. Distribución de frecuencias de edad en estos nulos
+# distribución según las diferentes edades
 table(df_educacion_na$edad)
-
-skimr::skim(df_educacion_na)
-
-#//////// Se mantienen los NA de las variables de consume_azucar, frecuencia_azucar, nivel_educativo pero se imputa la de ingreso
-df_final <- df_final %>%
-  group_by(cod_mpio) %>%
-  mutate(ingreso_pc = ifelse(is.na(ingreso_pc),
-                             median(ingreso_pc, na.rm = TRUE),
-                             ingreso_pc)) %>%
-  ungroup()
 ```
 
 Excluyendo de los análisis los menores de edad:
@@ -453,38 +530,131 @@ Durante la exploración de los datos, se evidenció una ausencia sistemática de
 2.  **Focalización epidemiológica:** Las enfermedades crónicas analizadas son eventos propios de la etapa adulta. Incluir población pediátrica (donde la prevalencia del evento es cercana a cero) distorsionaría las frecuencias relativas y las tasas de prevalencia generales, opacando los patrones de salud que se buscan identificar en la población de riesgo.
 
 ```{r}
-# Creación del dataset analítico definitivo
-df_analisis <- df_final %>%
-  # 1. CRITERIO DE INCLUSIÓN: Población Adulta
+# df sin los menores de 18 años
+df_final <- df_final %>%
   filter(edad >= 18) 
 
+df_final <- df_final %>%
+  mutate(
+    nivel_educativo = fct_na_value_to_level(nivel_educativo, level = "Sin información"))
 # Verificación final:
-skim(df_analisis$nivel_educativo)
+skim(df_final$nivel_educativo)
 ```
-
-Ahora teniendo la base de datos limpia, podemos consolidar una variable adicional de intencidad de consumo de bebidas azucaradas:
+Para el caso de los NAs de la variable ingreso_pc no se encuentra una explicación y se decide imputar de forma lógica con la mediana de ingreso por municipio del. 
 
 ```{r}
-# 1. PREPARACIÓN DE DATOS
-# Realizamos todas las transformaciones y etiquetado en un solo bloque para evitar conflictos.
+df_final <- df_final %>%
+  group_by(cod_mpio) %>%
+  mutate(ingreso_pc = ifelse(is.na(ingreso_pc),
+                             median(ingreso_pc, na.rm = TRUE),
+                             ingreso_pc)) %>%
+  ungroup()
+skimr::skim(df_final$ingreso_pc)
+```
 
-df_analisis <- df_analisis %>%
+```{r}
+skimr::skim(df_final)
+```
+
+####2.1.4) Identificación de valores atípicos o valores imposibles: 
+
+VARIABLE FEX
+
+```{r}
+# Calcular el límite estadístico (Q3 + 1.5*IQR)
+Q1_fex <- quantile(df_final$fex, 0.25, na.rm = TRUE)
+Q3_fex <- quantile(df_final$fex, 0.75, na.rm = TRUE)
+IQR_fex <- Q3_fex - Q1_fex
+
+limite_fex <- Q3_fex + (1.5 * IQR_fex)
+
+limite_fex
+
+# Graficando 
+ggplot(df_final) +
+  # Barras azules: Datos normales
+  geom_histogram(data = filter(df_final, fex <= limite_fex),
+                 aes(x = fex), fill = "steelblue", bins = 50) +
+  # Barras rojas: Outliers
+  geom_histogram(data = filter(df_final, fex > limite_fex),
+                 aes(x = fex), fill = "red", bins = 50) +
+  scale_x_log10(labels = scales::comma) + 
+  labs(title = "Outliers en Factor de Expansión (FEX)", 
+       subtitle = "En rojo: valores que superan el límite estadístico") +
+  theme_minimal()
+```
+VARIABLE EDAD
+
+```{r}
+# Calcular el límite estadístico
+Q1_edad <- quantile(df_final$edad, 0.25, na.rm = TRUE)
+Q3_edad <- quantile(df_final$edad, 0.75, na.rm = TRUE)
+IQR_edad <- Q3_edad - Q1_edad
+
+limite_edad <- Q3_edad + (1.5 * IQR_edad)
+
+# Ver el número exacto del corte
+print(paste("Cualquier edad mayor a", round(limite_edad, 1), "es un outlier estadístico"))
+
+# graficando
+ggplot(df_final) +
+  geom_histogram(data = filter(df_final, edad <= limite_edad),
+                 aes(x = edad), fill = "steelblue", binwidth = 2) +
+  geom_histogram(data = filter(df_final, edad > limite_edad),
+                 aes(x = edad), fill = "red", binwidth = 2) +
+  labs(title = "Outliers en Edad",
+       subtitle = "En rojo: edades avanzadas que salen del rango intercuartílico") +
+  theme_minimal()
+
+table(df_final$edad)
+```
+
+VARIABLE INGRESO PER CAPITA
+
+```{r}
+# Calcular el límite estadístico 
+Q1_ing <- quantile(df_final$ingreso_pc, 0.25, na.rm = TRUE)
+Q3_ing <- quantile(df_final$ingreso_pc, 0.75, na.rm = TRUE)
+IQR_ing <- Q3_ing - Q1_ing
+
+limite_ingreso <- Q3_ing + (1.5 * IQR_ing)
+
+# Ver el número exacto del corte
+print(paste("Cualquier ingreso mayor a", round(limite_ingreso, 0), "es un outlier"))
+
+# Graficando
+ggplot(df_final) +
+  geom_histogram(data = filter(df_final, ingreso_pc <= limite_ingreso),
+                 aes(x = ingreso_pc), fill = "steelblue", bins = 50) +
+  geom_histogram(data = filter(df_final, ingreso_pc > limite_ingreso),
+                 aes(x = ingreso_pc), fill = "red", bins = 50) +
+  scale_x_log10(labels = scales::dollar) + 
+  labs(title = "Outliers en ingreso per cápita",
+       subtitle = "En rojo: ingresos atípicamente altos") +
+  theme_minimal()
+```
+Se realizó inicialmente una evaluación estadística de outliers buscando utilizando los cuartiles y los RIQ,para las variables de edad, ingreso_pc y fex. sin embargo, despues de una evaluación lógica de los valores mihnimos y maximos de edad e ingreso_pc se consideró que no era necesario realizar un tratamiento adicional. La variable Fex se mantiene sin modificaciones ya que es un factor de expansión. 
+
+####2.1.5) Recodificación de variables
+
+Codificamos dos variables de intensidad de consumo para agrupar las variables de consumo(si/no) y la variable de frecuencia de consumo (de poco frecuente a diario). Para esto decidimos crear dos variables: consumo_agrupado y consumo_detallado definidas en el codigo. 
+
+```{r}
+
+# copia de backup
+df_final_d <- df_final
+
+#df_final <- df_final_d
+
+# Transformaciones de la variable X
+df_analisis <- df_final %>%
   mutate(
-    # --- A. Variable de Desenlace (Y) ---
-    # Primero numérico 0/1
-    cronica_num = if_else(cronica_12m == 1, 1, 0),
-    # Inmediatamente lo convertimos a Factor con etiquetas finales
-    cronica_binaria = factor(cronica_num, 
-                             levels = c(0, 1), 
-                             labels = c("No", "Sí")),
-    
-    # --- B. Variables de exposición (X) ---
     freq_num = case_when(
-      consume_azucar == 2 ~ 0,
+      consume_azucar == "No" ~ 0,
       TRUE ~ as.numeric(frecuencia_azucar)
     ),
     
-    # Agrupada (Texto temporal)
+    # Agrupada
     consumo_agrupado_txt = case_when(
       freq_num == 0 ~ "No consume",
       freq_num %in% c(5, 6) ~ "Ocasional (< 2/sem)",
@@ -508,68 +678,57 @@ df_analisis <- df_analisis %>%
                                           "2-3 veces/sem",
                                           "4-6 veces/sem",
                                           "Diario (1)",
-                                          "Diario (2+)"))
+                                          "Diario (2+)")), 
+    # Creación de grupos etarios
+    grupo_edad = case_when(
+      edad < 30 ~ "Jóvenes (18-29)",
+      edad >= 30 & edad < 40 ~ "Adultos Jóvenes (30-39)",
+      edad >= 40 & edad < 50 ~ "Adultez Media (40-49)",
+      edad >= 50 & edad < 60 ~ "Madurez (50-59)",
+      edad >= 60 & edad < 70 ~ "Adulto mayor (60-69)",
+      edad >= 70 ~ "Vejez extrema (70+)"
+    ),
+    # Ordenamos los niveles para los gráficops
+    grupo_edad = factor(grupo_edad, levels = c("Jóvenes (18-29)", 
+                                               "Adultos Jóvenes (30-39)", 
+                                               "Adultez Media (40-49)", 
+                                               "Madurez (50-59)", 
+                                               "Adulto mayor (60-69)", 
+                                               "Vejez extrema (70+)"))
   )
 
-# 2. CONFIGURACIÓN DE EXPORTACIÓN
+# Recodificando la variable sexo
+df_analisis <- df_analisis %>%
+  mutate(
+    sexo = if_else(sexo == 1, "Hombre", "Mujer"),
+    sexo = factor(sexo, levels = c("Hombre", "Mujer"))
+  )
 
-# Función 
-tabla_frec <- function(datos, var) {
-  datos %>%
-    count({{var}}, .drop = FALSE) %>% 
-    mutate(
-      n = as.integer(n), # Asegurar que n es entero
-      porcentaje = round(n / sum(n) * 100, 1)
-    ) %>%
-    rename(Categoria = 1, Frecuencia = n, `%` = porcentaje)
-}
+skim(df_analisis)
 
-# 3. GENERACIÓN Y GUARDADO DE TABLAS
-lista_tablas <- list(
-  "Variable_Agrupada" = df_analisis %>% tabla_frec(consumo_agrupado),
-  "Variable_Detallada" = df_analisis %>% tabla_frec(consumo_detallado),
-  "Variable_Desenlace_Cronica" = df_analisis %>% tabla_frec(cronica_binaria)
-)
-
-for (nombre in names(lista_tablas)) {
-  
-  # Definir ruta
-  ruta_archivo <- file.path("Graficos-tablas", paste0(nombre, ".html"))
-  
-  # Crear HTML con kable
-  html_tabla <- lista_tablas[[nombre]] %>%
-    kable(format = "html", 
-          caption = gsub("_", " ", nombre), # Título legible en la tabla
-          align = 'c') %>%
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                  full_width = F, 
-                  position = "center") %>%
-    column_spec(1, bold = T) %>% # Negrita a la primera columna
-    as.character()
-  
-  # Guardar
-  writeLines(html_tabla, ruta_archivo)
-}
 ```
 
 ### 2.2) Análisis univariado sistemático
 
-De la base df_final se obtiene la base df_analisis, filtrada para adultos mayores de 18 años. Esta base contiene 172.538 observaciones, con 20 variables de distintos tipos: numéricas, factores y caracteres. Incluye identificadores como directorio, secuencia_p y orden.
-```{r}
-#//////// Se revisa la base 
-df_analisis %>% 
-  summarise(across(
-    everything(),
-    ~ tibble(
-        tipo_variable = class(.),
-        observaciones = sum(!is.na(.))
-      ),
-    .names = "{.col}"
-  )) %>% 
-  pivot_longer(everything(), names_to = "variable") %>%
-  unnest(cols = value)
+variables: enfermedad cronica, intensidad de consumo (agrupado y detallado), edad y grupo eatrio, 
 
-```
+tabla 
+
+
+Categóricas: bar plots y la tabla correspondiente (medidas absolutas y relativas; ponderadas y sin ponderar)
+
+Numérica: Edad: 
+   grafico de densidad ponderado y sin ponderar
+   ponderado: media, DS, mediana, RIQ, Min-Max
+   
+   
+   
+   
+   
+   
+   
+   
+
 
 ```{r}
 # Variables Categóricas 
@@ -753,11 +912,6 @@ df_bivariado <- df_analisis %>%
                                    "Ocasional (< 2/sem)", 
                                    "Frecuente (2-6/sem)", 
                                    "Diario (Todos los días)"),
-    # Ajustando la codificación de sexo
-    sexo = factor(sexo, 
-                  levels = c(1, 2), 
-                  labels = c("Hombre", "Mujer")),
-    
     # Creación de grupos etarios
     grupo_edad = case_when(
       edad < 30 ~ "Jóvenes (18-29)",
@@ -820,7 +974,7 @@ df_grafico_sexo <- df_bivariado %>%
 
 ```
 
-Ahora exportamos las tablas al formato seleccionado: 
+Ahora exportamos las tablas al formato seleccionado:
 
 ```{r}
 # Función auxiliar para formatear y guardar
@@ -958,12 +1112,11 @@ print(p_lineas_sexo)
 
 Análisis global (paradoja de la causalidad reversa): al examinar la relación cruda entre el consumo de bebidas azucaradas y la enfermedad crónica a nivel nacional, se observa una asociación negativa aparente: la prevalencia de enfermedad es drásticamente mayor en el grupo que "No consume" (24.0%) comparado con quienes consumen "Diariamente" (8.6%). Desde una perspectiva epidemiológica y económica, este hallazgo no sugiere un efecto protector del azúcar, sino que evidencia un fuerte sesgo de selección por causalidad inversa (fenómeno sick-quitter). Es altamente probable que el diagnóstico de patologías como diabetes o hipertensión actúe como el determinante exógeno que fuerza a los individuos a modificar su dieta, concentrando así a la población con peor salud en la categoría de "No consumidores" y distorsionando la estimación del riesgo real.
 
-Estratificación por grupo etario (heterogeneidad del efecto):  Al controlar por decenios de edad, se despeja parcialmente esta distorsión. Si bien el efecto sick-quitter persiste transversalmente (los "No consumidores" siempre son los más enfermos en todos los grupos etarios), el comportamiento dentro de la población consumidora revela patrones divergentes. En los grupos económicamente activos (18 a 59 años), emerge una tendencia no lineal en forma de "J": tras excluir a los abstemios, se observa un gradiente positivo donde la prevalencia repunta al transitar de un consumo "Frecuente" a uno "Diario", sugiriendo una asociación dosis-respuesta oculta en el análisis global. Por el contrario, en la vejez (60+ años), la tendencia se torna linealmente negativa, comportamiento atribuible a la restricción médica estricta y a un marcado sesgo de supervivencia, donde los individuos más vulnerables fallecen prematuramente, disminuyendo artificialmente la prevalencia observada en los consumidores longevos.
+Estratificación por grupo etario (heterogeneidad del efecto): Al controlar por decenios de edad, se despeja parcialmente esta distorsión. Si bien el efecto sick-quitter persiste transversalmente (los "No consumidores" siempre son los más enfermos en todos los grupos etarios), el comportamiento dentro de la población consumidora revela patrones divergentes. En los grupos económicamente activos (18 a 59 años), emerge una tendencia no lineal en forma de "J": tras excluir a los abstemios, se observa un gradiente positivo donde la prevalencia repunta al transitar de un consumo "Frecuente" a uno "Diario", sugiriendo una asociación dosis-respuesta oculta en el análisis global. Por el contrario, en la vejez (60+ años), la tendencia se torna linealmente negativa, comportamiento atribuible a la restricción médica estricta y a un marcado sesgo de supervivencia, donde los individuos más vulnerables fallecen prematuramente, disminuyendo artificialmente la prevalencia observada en los consumidores longevos.
 
 Dinámica de género y sesgo de supervivencia diferencial: El análisis de las trayectorias vitales añade una capa de complejidad mediante la brecha de género. Aunque en etapas tempranas (18-29 años) las curvas de prevalencia se solapan, con la edad se produce una separación progresiva donde las mujeres reportan tasas sistemáticamente más altas, atribuible a una mayor frecuencia de diagnóstico y uso de servicios de salud frente al sub-registro masculino. Críticamente, al llegar a la tercera edad, se evidencia una atrición diferencial: mientras las mujeres mantienen el patrón de riesgo en "J" hasta la vejez extrema, los hombres pierden dicha señal a partir de los 60 años. Esto sugiere que los hombres con alto consumo y predisposición a enfermar sufren una mortalidad prematura selectiva, dejando en la muestra de ancianos a un subgrupo de "sobrevivientes resilientes" que sesgan la asociación hacia la nulidad, fenómeno menos acentuado en mujeres debido a su mayor esperanza de vida con morbilidad.
 
 Conclusión del análisis descriptivo: en síntesis, la evidencia descriptiva bivariada sugiere que sí existe una asociación positiva estructural entre la intensidad del consumo y la enfermedad crónica, pero esta relación es condicional a la edad y al sexo. De esta manera, el análisis bivariado puede ser insuficiente debido a la contaminación por causalidad reversa y sesgos de selección y supervivencia. Por consiguiente, es importasnte usar modelos multivariados que aíslen el riesgo biológico real, controlando por la confusión demográfica y ajustando la categoría de referencia para mitigar el sesgo de endogeneidad introducido por el cambio de comportamiento post-diagnóstico.
-
 
 #### Prueba estadística bivariada
 
@@ -1100,7 +1253,6 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 
 3.  **Panel inferior (heterogeneidad observada):** Controlando por covariables, se puede identificar que las mujeres tienen una propensión sistemáticamente mayor al reporte de la condición, *ceteris paribus*.
 
-
 ## 2.4)Modelamiento de datos relacionales
 
 ```{r}
@@ -1192,9 +1344,6 @@ lista_tablas_final <- list(
 write_xlsx(lista_tablas_final, "Data/Modelo_Datos_Completo.xlsx")
 ```
 
-
-
 # Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados
 
 Revisión de Power BI
-
