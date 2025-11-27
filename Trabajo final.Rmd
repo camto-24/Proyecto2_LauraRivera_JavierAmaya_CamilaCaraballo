@@ -36,6 +36,7 @@ pacman::p_load(
   stringr,
   gt,
   webshot2,
+  Hmisc,
 
   # B) Modelado y análisis estadístico/econométrico
   fixest,       # Estimación de modelos de efectos fijos de alto rendimiento.
@@ -72,8 +73,6 @@ o **Variable dependiente**:
 
     Categorías: 1 = Sí / 2 = No
 
-    Tipo: Variable discreta numérica
-
 o **Variable independiente**:
 
 -   Variable: Consumo de bebidas azucaradas (P1707)
@@ -82,15 +81,11 @@ o **Variable independiente**:
 
     Categorías: 1 = Sí / 2 = No
 
-    Tipo: Variable discreta numérica
-
 -   Variable: Frecuencia de consumo de bebidas azucaradas (P1707S1)
 
     Pregunta: “Con que frecuencia consume las bebidas azucaradas:
 
     Categorías: 1 Todos los días de la semana (dos o más veces al día) 2 Todos los días de la semana (una vez al día) 3 Cuatro a seis veces a la semana 4 Dos o tres veces a la semana 5 Una vez a la semana 6 Menos de una vez por semana
-
-    Tipo: Variable discreta numérica
 
 o **Dimensiones de análisis de interés**: Las variables control que requiere utilizar en el proyecto son:
 
@@ -102,27 +97,15 @@ o **Dimensiones de análisis de interés**: Las variables control que requiere u
 
     Categorías: 1= Hombre / 2= Mujer
 
-    Tipo: Variable discreta numérica
-
-    Justificación: El riesgo de desarrollar enfermedades crónicas y los patrones de consumo de bebidas azucaradas suelen diferir entre hombres y mujeres. Incluir esta variable permite controlar por diferencias biológicas y de comportamiento alimentario, efectos heterogéneos.
-
 -   Variable: Edad (P6040)
 
     Pregunta: “¿Cuántos años cumplidos tiene?”
-
-    Tipo: Variable discreta numérica
-
-    Justificación: La edad es el principal factor de riesgo para la aparición de enfermedades crónicas. Además, los hábitos alimenticios tienden a variar a lo largo del ciclo de vida. Por su importancia epidemiológica, debe ser controlada en el análisis.
 
 -   Variable: Parentesto (P6051)
 
     Pregunta:“¿Cuál es el parentesco de la persona con el jefe/a de hogar?”
 
     Categorías: 1. Jefe/a del hogar 2. Pareja, esposo/a, cónyuge, compañero/a 3. Hijo/a, hijastro/a 4. Nieto/a 5. Padre, madre, padrastro, madrastra 6. Suegro o suegra 7. Hermano/a, hemanastro/a 8. Yerno, nuera 9. Otro/a pariente del/de la jefe/a 10. Empleado/a del servicio doméstico 11. Parientes del servicio doméstico 12. Trabajador/a 13. Pensionista 14. Otro(a) no pariente
-
-    Tipo: Variable discreta numérica
-
-    Justificación: Permite caracterizar la estructura del hogar y, si se realizan análisis agregados por hogar, identificar roles que influyen en las decisiones alimentarias o responsabilidades en la compra y preparación de alimentos.
 
 **Base 3: Educación**
 
@@ -132,19 +115,11 @@ o **Dimensiones de análisis de interés**: Las variables control que requiere u
 
     Categorías: 1Ninguno 2 Preescolar 3 Básica Primaria (1º - 5º) 4 Básica secundaria (6º--9º) 5 Media (10º -13º) 6 Técnico sin título 7 Técnico con título 8 Tecnológico sin título 9 Tecnológico con título 10 Universitario sin titulo 11 Universitario con titulo 12 Postgrado sin titulo 13 Postgrado con titulo
 
-    Tipo: Variable discreta numérica
-
-    Justificación: El nivel educativo influye en el conocimiento sobre nutrición, el entendimiento de riesgos asociados al consumo de azúcar y la capacidad para adoptar comportamientos saludables.
-
 **Base 4: Servicios del Hogar**
 
 -   Variable: ingreso per capita del hogar (PERCAPITA)
 
     Descripción:Monto total de ingresos del hogar dividido entre el número de integrantes.
-
-    Tipo: Variable discreta numérica
-
-    Justificación:Refleja la capacidad adquisitiva individual. Determina el tipo y cantidad de alimentos consumidos, incluidos productos ultraprocesados como bebidas azucaradas.
 
 o **Ámbito: Geografía/periodo de referencia o Latente**: ¿Existe? Proxy propuesta (si aplica)
 
@@ -710,188 +685,431 @@ skim(df_analisis)
 
 ### 2.2) Análisis univariado sistemático
 
-variables: enfermedad cronica, intensidad de consumo (agrupado y detallado), edad y grupo eatrio, 
+#### 2.2.1) Enfermedad crónica
 
-tabla 
+El análisis comienza revisando cómo se distribuye la variable dependiente, es decir, si la persona reportó o no una enfermedad crónica en los últimos 12 meses. Antes de interpretar cualquier resultado, era importante verificar qué tan bien la muestra representa a la población. Para eso comparé las proporciones no ponderadas con las proporciones ponderadas usando el factor de expansión del DANE. Los valores resultaron prácticamente iguales (15.8% en la muestra vs. 15.2% en la población), así que la muestra efectivamente refleja muy bien la estructura poblacional. Por esta razón, tiene sentido utilizar las ponderaciones en el resto del análisis.
 
-
-Categóricas: bar plots y la tabla correspondiente (medidas absolutas y relativas; ponderadas y sin ponderar)
-
-Numérica: Edad: 
-   grafico de densidad ponderado y sin ponderar
-   ponderado: media, DS, mediana, RIQ, Min-Max
-   
-   
-   
-   
-   
-   
-   
-   
-
+Con la estimación ponderada, la prevalencia de enfermedad crónica en los últimos 12 meses es del 15.2%, mientras que el 84.8% de la población no reporta este tipo de diagnóstico
 
 ```{r}
-# Variables Categóricas 
-vars_categoricas <- list(
-  "Habitos" = c("consume_azucar", "frecuencia_azucar"),
-  "Sociodemograficas" = c("sexo", "parentesco", "nivel_educativo"),
-  "Salud" = c("cronica_12m", "cronica_binaria")
-)
+# Cálculo NO Ponderado (Muestra real) 
+tabla_no_pond <- df_analisis %>%
+  count(cronica_12m) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
 
-# Variables Numéricas 
-vars_numericas <- list(
-  "Sociodemograficas" = c("edad", "ingreso_pc")
-)
+# Cálculo Ponderado (Estimación Poblacional) 
+tabla_pond <- df_analisis %>%
+  group_by(cronica_12m) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
 
-# Función para Variables Categóricas
-analisis_univariado_cat <- function(varname, df) {
-  
-  # --- Tabla sin ponderar
-  tabla_simple <- df %>%
-    filter(!is.na(!!sym(varname))) %>% 
-    count(!!sym(varname)) %>%
-    mutate(
-      n_sinpond = as.numeric(n),
-      porc_sinpond = round(100 * n / sum(n), 1)
-    ) %>%
-    select(!!sym(varname), n_sinpond, porc_sinpond)
-  
-  # --- Tabla ponderada
-  tabla_pond <- df %>%
-    filter(!is.na(!!sym(varname))) %>%
-    group_by(!!sym(varname)) %>%
-    summarise(n_pond = sum(fex, na.rm = TRUE), .groups = "drop") %>%
-    mutate(porc_pond = round(100 * n_pond / sum(n_pond), 1))
-  
-  # --- Combinar
-  tabla_comp <- tabla_simple %>%
-    full_join(tabla_pond, by = varname) %>%
-    arrange(!!sym(varname))
-  
-  # --- Guardar tabla HTML
-  color_header <- pal[25] 
-  
-  tabla_html <- tabla_comp %>%
-    kable(
-      "html",
-      caption = paste0("<b style='color:", color_header, "; font-size:16px;'>Variable Categórica: ", varname, "</b>"),
-      col.names = c(varname, "N (sin pond.)", "% (sin pond.)", "N (pond.)", "% (pond.)"),
-      digits = 1
-    ) %>%
-    add_header_above(c(" " = 1, "Sin ponderar" = 2, "Ponderado" = 2)) %>%
-    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"),
-                  position = "center") %>%
-    row_spec(0, bold = TRUE, color = "white", background = color_header)
-  
-  save_kable(tabla_html, paste0("Graficos-tablas/tabla_cat_", varname, ".html"))
-  
-  # --- Gráfico de Barras
-  tabla_grafico <- tabla_comp %>%
-    select(!!sym(varname), porc_sinpond, porc_pond) %>%
-    pivot_longer(cols = c(porc_sinpond, porc_pond),
-                 names_to = "tipo", values_to = "porc") %>%
-    mutate(tipo = ifelse(tipo == "porc_pond", "Ponderado", "Sin ponderar"))
-  
-  grafico <- ggplot(tabla_grafico, aes(x = factor(!!sym(varname)), y = porc, fill = tipo)) +
-    geom_col(position = "dodge", alpha = 0.9) +
-    geom_text(aes(label = paste0(porc, "%")),
-              position = position_dodge(width = 0.9), vjust = -0.4, size = 3.5) +
-    scale_fill_manual(values = c("Sin ponderar" = pal[10], "Ponderado" = pal[25])) +
-    labs(title = paste0("Distribución: ", varname), x = varname, y = "Porcentaje", fill = "Tipo") +
-    theme_minimal()
-  
-  ggsave(paste0("Graficos-tablas/grafico_cat_", varname, ".png"), plot = grafico, width = 10, height = 6)
-}
+# Unir Tablas 
+tabla_final <- tabla_no_pond %>%
+  left_join(tabla_pond, by = "cronica_12m")
 
-# Función para Variables Numéricas
-analisis_univariado_cont <- function(varname, df) {
-  
-  # 1. Calcular Estadísticos Descriptivos
-  stats <- df %>%
-    filter(!is.na(!!sym(varname))) %>%
-    summarise(
-      Media_SP = mean(!!sym(varname)),
-      Mediana_SP = median(!!sym(varname)),
-      Min_SP = min(!!sym(varname)),
-      Max_SP = max(!!sym(varname)),
-      Media_Pond = weighted.mean(!!sym(varname), w = fex)
-    ) %>%
-    pivot_longer(cols = everything(), names_to = "Metrica", values_to = "Valor")
-  
-  # 2. Guardar Tabla de Estadísticos
-  color_header <- pal[25]
-  
-  tabla_html <- stats %>%
-    mutate(Valor = round(Valor, 2)) %>%
-    kable("html", caption = paste0("<b style='color:", color_header, "; font-size:16px;'>Variable Numérica: ", varname, "</b>")) %>%
-    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"), position = "center") %>%
-    row_spec(0, bold = TRUE, color = "white", background = color_header)
-  
-  save_kable(tabla_html, paste0("Graficos-tablas/tabla_num_", varname, ".html"))
-  
-  # 3. Gráfico de Densidad (Curva) comparativo
-  grafico <- ggplot(df, aes(x = !!sym(varname))) +
-    geom_density(aes(fill = "Sin ponderar"), alpha = 0.4) +
-    geom_density(aes(weight = fex, fill = "Ponderado"), alpha = 0.4) +
-    scale_fill_manual(name = "Tipo", values = c("Sin ponderar" = pal[10], "Ponderado" = pal[25])) +
-    labs(
-      title = paste0("Distribución (Densidad): ", varname),
-      subtitle = "Comparación de distribución ponderada vs muestral",
-      x = varname,
-      y = "Densidad"
-    ) +
-    theme_minimal() +
-    theme(legend.position = "top")
-  
-  ggsave(paste0("Graficos-tablas/grafico_num_", varname, ".png"), plot = grafico, width = 10, height = 6)
-}
+print(head(tabla_final))
 
-# --- Variables categóricas
-for(grupo in names(vars_categoricas)){
-  for(varname in vars_categoricas[[grupo]]){
-    analisis_univariado_cat(varname, df_analisis)
-  }
-}
+# Gráfico comparativo 
+datos_grafico <- tabla_final %>%
+  select(cronica_12m, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
 
-# --- Variables numéricas
-for(grupo in names(vars_numericas)){
-  for(varname in vars_numericas[[grupo]]){
-    analisis_univariado_cont(varname, df_analisis)
-  }
-}
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+univariado_cronica <- ggplot(datos_grafico, aes(x = cronica_12m, y = proporcion, fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  # Colores 
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  # Etiquetas 
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "¿Presenta enfermedad crónica (últimos 12 meses)?",
+    x = "Respuesta",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray") 
+  ) +
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3.5
+  )
+
+print(univariado_cronica)
+
+# Guardar 
+ggsave("Graficos-tablas/univariado_cronica.png", univariado_cronica, width = 8, height = 6)
 ```
+
+#### 2.2.2) Consumo agrupado
+
+El gráfico muestra la distribución poblacional del consumo de bebidas azucaradas, comparando la muestra con los datos ponderados mediante el factor de expansión (fex). Alrededor del 36% de la población no consume estas bebidas, mientras que el consumo ocasional y frecuente representa más del 50%, y el consumo diario alcanza cerca del 12.7%. Las diferencias entre la muestra y la población son mínimas, lo que confirma que la ponderación ajusta ligeramente las proporciones para garantizar una representación confiable en el análisis de la relación con la enfermedad crónica.
 
 ```{r}
 
-# Histograma y Boxplot para variables numéricas
-graficos_adicionales_num <- function(varname, df) {
+# Cálculo NO Ponderado (Muestra real)
+tabla_no_pond_ca <- df_analisis %>%
+  count(consumo_agrupado) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
 
-  # --- Histograma
-  histo <- ggplot(df, aes(x=!!sym(varname))) +
-    geom_histogram(fill=pal[10], color="white", bins=30) +
-    labs(title=paste0("Histograma: ", varname), x=varname, y="Frecuencia") +
-    theme_minimal()
-  
-  ggsave(paste0("Graficos-tablas/hist_num_", varname, ".png"), plot=histo, width=10, height=6, dpi=300)
-  
-  # --- Boxplot
-  box <- ggplot(df, aes(x=factor(1), y=!!sym(varname))) +
-    geom_boxplot(fill=pal[15], outlier.color="red", outlier.size=1.5) +
-    labs(title=paste0("Boxplot: ", varname), x="", y=varname) +
-    theme_minimal()
-  
-  ggsave(paste0("Graficos-tablas/box_num_", varname, ".png"), plot=box, width=6, height=6, dpi=300)
-}
+# Cálculo Ponderado (Estimación poblacional)
+tabla_pond_ca <- df_analisis %>%
+  group_by(consumo_agrupado) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
 
-# Aplicar solo a variables numéricas
-for(cat in names(vars_numericas)){
-  for(var in vars_numericas[[cat]]){
-    graficos_adicionales_num(var, df_analisis)
-  }
-}
+# --- Unir tablas
+tabla_final_ca <- tabla_no_pond_ca %>%
+  left_join(tabla_pond_ca, by = "consumo_agrupado")
+
+print(head(tabla_final_ca))
+
+# Gráfico
+datos_grafico_ca <- tabla_final_ca %>%
+  select(consumo_agrupado, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
+
+# Paleta TEAL
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+univariado_consumo <- ggplot(datos_grafico_ca,
+                             aes(x = consumo_agrupado,
+                                 y = proporcion,
+                                 fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "Distribución de consumo de bebidas azucaradas (agrupado)",
+    x = "Categoría de consumo",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray")
+  ) +
+  
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3.5
+  )
+
+print(univariado_consumo)
+
+# Guardar gráfico
+ggsave("Graficos-tablas/univariado_consumo_agrupado.png",
+       univariado_consumo,
+       width = 8,
+       height = 6)
+
+```
+#### 2.2.3) Consumo detallado
+
+El gráfico muestra que el 36.8% de la población no consume bebidas azucaradas, mientras que el consumo de baja frecuencia es el más común, con 16.2% una vez por semana y 18.6% de 2 a 3 veces por semana. El consumo diario o superior alcanza alrededor del 12% de la población. Las diferencias entre la muestra y la población son mínimas, lo que refuerza la importancia de usar los datos ponderados para obtener estimaciones precisas al analizar la posible relación entre consumo de bebidas azucaradas y enfermedad crónica.
+
+```{r}
+# Cálculo NO Ponderado (Muestra real)
+tabla_no_pond_cd <- df_analisis %>%
+  count(consumo_detallado) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
+
+# Cálculo Ponderado (Estimación poblacional)
+tabla_pond_cd <- df_analisis %>%
+  group_by(consumo_detallado) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
+
+# --- Unir tablas
+tabla_final_cd <- tabla_no_pond_cd %>%
+  left_join(tabla_pond_cd, by = "consumo_detallado")
+
+print(head(tabla_final_cd))
+
+# Gráfico
+datos_grafico_cd <- tabla_final_cd %>%
+  select(consumo_detallado, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
+
+# Paleta TEAL
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+univariado_consumo_det <- ggplot(datos_grafico_cd,
+                                 aes(x = consumo_detallado,
+                                     y = proporcion,
+                                     fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "Distribución de consumo de bebidas azucaradas (detallado)",
+    x = "Categoría de consumo",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray")
+  ) +
+  
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    hjust = -0.1,  # Ajusta la posición horizontal de las etiquetas
+    size = 3.5
+  ) +
+  
+  coord_flip()  # Esto voltea el gráfico
+
+print(univariado_consumo_det)
+
+# Guardar gráfico
+ggsave("Graficos-tablas/univariado_consumo_detallado.png",
+       univariado_consumo_det,
+       width = 8,
+       height = 6)
+
 
 ```
 
+#### 2.2.4) Grupo edad
+
+El factor de expansión, refleja la distribución real de la población por edades. Esto es importante porque la edad puede influir tanto en el consumo de bebidas azucaradas como en la probabilidad de tener una enfermedad crónica. Al corregir pequeñas desviaciones en la representación de los grupos etarios, nos aseguramos de que cualquier relación que encontremos entre el consumo de bebidas azucaradas y la enfermedad crónica no esté sesgada por una muestra que sobre- o sub-representa ciertos grupos de edad. En otras palabras, la ponderación permite que el análisis sea más confiable y generalizable a la población real.
+
+```{r}
+# Cálculo NO Ponderado (Muestra real)
+tabla_no_pond_ge <- df_analisis %>%
+  count(grupo_edad) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
+
+# Cálculo Ponderado (Estimación poblacional)
+tabla_pond_ge <- df_analisis %>%
+  group_by(grupo_edad) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
+
+# Unir tablas
+tabla_final_ge <- tabla_no_pond_ge %>%
+  left_join(tabla_pond_ge, by = "grupo_edad")
+
+print(head(tabla_final_ge))
+
+# Gráfico
+datos_grafico_ge <- tabla_final_ge %>%
+  select(grupo_edad, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
+
+# Paleta TEAL
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+# Gráfico horizontal
+univariado_grupo_edad <- ggplot(datos_grafico_ge,
+                                  aes(x = grupo_edad,
+                                      y = proporcion,
+                                      fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  # Colores
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  # Etiquetas
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "Distribución por grupos de edad",
+    x = "Grupo de edad",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray")
+  ) +
+  
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    hjust = -0.1,   
+    size = 3.5
+  ) +
+  coord_flip()
+
+print(univariado_grupo_edad)
+
+# Guardar gráfico
+ggsave("Graficos-tablas/univariado_grupo_edad.png",
+       univariado_grupo_edad,
+       width = 8,
+       height = 6)
+
+
+```
+#### 2.2.5) Edad
+
+El gráfico de densidad muestra que la distribución de edad de la muestra y de la población ponderada es muy similar, aunque la muestra tiende a sobre-representar ligeramente a los jóvenes de 25 a 35 años, mientras que la población ponderada muestra mayor densidad en edades intermedias y mayores (45-70 años). Esta pequeña diferencia destaca la importancia de la ponderación para corregir sesgos y asegurar estimaciones precisas de la edad en el estudio.
+
+```{r}
+# Estadísticos No Ponderados
+stats_no_pond <- df_analisis %>%
+  summarise(
+    N_obs = n(),
+    Media = mean(edad, na.rm = TRUE),
+    DS = sd(edad, na.rm = TRUE),
+    Q25 = quantile(edad, 0.25, na.rm = TRUE),
+    Mediana = quantile(edad, 0.50, na.rm = TRUE),
+    Q75 = quantile(edad, 0.75, na.rm = TRUE),
+    RIQ = Q75 - Q25,
+    Min = min(edad, na.rm = TRUE),
+    Max = max(edad, na.rm = TRUE)
+  ) %>%
+  mutate(Tipo = "No ponderado")
+
+# Estadísticos Ponderados
+stats_pond <- df_analisis %>%
+  summarise(
+    N_obs = sum(fex, na.rm = TRUE),
+    Media = weighted.mean(edad, w = fex, na.rm = TRUE),
+    DS = sqrt(sum(fex * (edad - weighted.mean(edad, w = fex, na.rm = TRUE))^2, na.rm = TRUE) / sum(fex, na.rm = TRUE)),
+    Q25 = wtd.quantile(edad, weights = fex, probs = 0.25, na.rm = TRUE),
+    Mediana = wtd.quantile(edad, weights = fex, probs = 0.5, na.rm = TRUE),
+    Q75 = wtd.quantile(edad, weights = fex, probs = 0.75, na.rm = TRUE),
+    RIQ = Q75 - Q25,
+    Min = min(edad, na.rm = TRUE),
+    Max = max(edad, na.rm = TRUE)
+  ) %>%
+  mutate(Tipo = "Ponderado")
+
+# Combinar tablas 
+tabla_final_edad <- bind_rows(stats_no_pond, stats_pond) %>%
+  select(Tipo, N_obs, Media, DS, Mediana, RIQ, Min, Max) %>%
+  mutate(across(c(Media, DS, Mediana, RIQ, Min, Max), ~round(., 2)))
+
+print(tabla_final_edad)
+
+# Gráfico de densidad comparativo
+paleta_teal <- c("#0097A7", "#26C6DA") 
+
+grafico_densidad_edad <- ggplot() +
+  geom_density(data = df_analisis,
+               aes(x = edad, color = "No ponderado", fill = "No ponderado"),
+               alpha = 0.5, linewidth = 1) +
+  geom_density(data = df_analisis,
+               aes(x = edad, weight = fex, color = "Ponderado", fill = "Ponderado"),
+               alpha = 0.5, linewidth = 1) +
+  scale_fill_manual(values = c("No ponderado" = paleta_teal[2], "Ponderado" = paleta_teal[1])) +
+  scale_color_manual(values = c("No ponderado" = paleta_teal[1], "Ponderado" = paleta_teal[1])) +
+  labs(
+    title = "Distribución de la Edad: No Ponderada vs Ponderada",
+    x = "Edad",
+    y = "Densidad",
+    fill = "Tipo de Medida",
+    color = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black")
+  )
+
+print(grafico_densidad_edad)
+
+# Guardar gráfico 
+ggsave("Graficos-tablas/univariado_edad.png",
+       grafico_densidad_edad,
+       width = 8,
+       height = 6)
+
+
+```
 ### 2.3) Análisis bivariado guiado por la pregunta
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
@@ -1253,7 +1471,7 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 
 3.  **Panel inferior (heterogeneidad observada):** Controlando por covariables, se puede identificar que las mujeres tienen una propensión sistemáticamente mayor al reporte de la condición, *ceteris paribus*.
 
-## 2.4)Modelamiento de datos relacionales
+## 2.4) Modelamiento de datos relacionales
 
 ```{r}
 # Preparación de llaves y IDs
