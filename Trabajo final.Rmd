@@ -168,6 +168,7 @@ Además, al contar con información territorial por departamento y municipio, es
 
 ```{r}
 #//////// Rutas y datos iniciales de las 4 bases
+#install.packages("here")
 #getwd()
 ruta <- here("data")
 
@@ -216,7 +217,7 @@ df_educacion <- educacion %>%
 df_servicios <- servicios %>%
   select(DIRECTORIO,
          SECUENCIA_P,
-         PERCAPITA   # Ingreso per cápita - REVISAR EN EQUIPO
+         PERCAPITA   # Ingreso per cápita 
          )       
 
 # 5. Base de Datos de la Vivienda (Nivel Vivienda)
@@ -343,47 +344,7 @@ df_final <- df_final %>%
 skimr::skim(df_final)
 ```
 
-```{r}
 
-#//////// Se revisa la base 
-
-# 1. Detectar categorías especiales
-
-categorias_especiales <- c(
-  "No sabe", "No responde", "Ns/Nr",
-  "ns", "nr", "sin dato", "no aplica",
-  98, 99, 999, 9999
-)
-
-# 2. Función auxiliar para detectar outliers (método IQR)
-detectar_outliers <- function(x) {
-  if (!is.numeric(x)) return(NA_integer_)
-  q1 <- quantile(x, 0.25, na.rm = TRUE)
-  q3 <- quantile(x, 0.75, na.rm = TRUE)
-  iqr <- q3 - q1
-  sum(x < (q1 - 1.5*iqr) | x > (q3 + 1.5*iqr), na.rm = TRUE)
-}
-
-# 3. Tabla resumen completa
-tabla_resumen <- df_final %>%
-  summarise(
-    variable = names(.),
-    tipo = map_chr(., ~ class(.x)[1]),
-    n_observaciones = map_int(., length),
-    n_na = map_int(., ~ sum(is.na(.x))),
-    categorias_especiales = map_int(., ~ sum(.x %in% categorias_especiales)),
-    mezcla_ns_nr = map_lgl(., ~ any(.x %in% categorias_especiales) & !all(.x %in% categorias_especiales)),
-    outliers = map_int(., detectar_outliers)
-  ) %>%
-  unnest(cols = c(tipo, n_observaciones, n_na, categorias_especiales, mezcla_ns_nr, outliers))
-
-tabla_resumen
-
-# Ver las categorías especiales y estan ok a lo que es la variable
-sort(unique(df_final$edad))
-sort(unique(df_final$cod_depto))
-
-```
 
 ```{r}
 # //////// Cambiar el tipo a las variables 
@@ -403,7 +364,7 @@ df_final <- df_final %>%
 summary(df_final)
 ```
 
-Revisión de outliers: Se identificaron valores atípicos en las variables Fex e ingreso_pc. La variable Fex se mantiene sin modificaciones, ya que es la variable de expansión. En cuanto a ingreso_pc, se revisaron los valores extremos, pero no se realizaron correcciones, dado que el valor máximo corresponde a 250 millones y se considera válido
+Revisión de outliers estadísticamente: Se identificaron valores atípicos en las variables Fex e ingreso_pc. La variable Fex se mantiene sin modificaciones, ya que es la variable de expansión. En cuanto a ingreso_pc, se revisaron los valores extremos, pero no se realizaron correcciones, dado que el valor máximo corresponde a 250 millones y se considera válido
 
 ```{r}
 # Se revisan cuantiles de las dos variables que tienen outliers
@@ -456,7 +417,7 @@ ggsave("Graficos-tablas/histograma_ingreso_pc.png", plot = hist_plot, width = 8,
 
 ```
 
-Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con los de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron con la mediana por municipio
+Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con las variables de consume_azucar y frecuencia_azucar. Los NA en ingreso_pc se imputaron con la mediana por municipio
 
 ```{r}
 #//////// Revisando los NA de educación que deben ser los menores de 5 años
@@ -481,8 +442,6 @@ df_final <- df_final %>%
                              median(ingreso_pc, na.rm = TRUE),
                              ingreso_pc)) %>%
   ungroup()
-
-
 ```
 
 Excluyendo de los análisis los menores de edad:
@@ -595,46 +554,21 @@ for (nombre in names(lista_tablas)) {
 
 ### 2.2) Análisis univariado sistemático
 
-De la base df_final se obtiene la base df_analisis, filtrada para adultos mayores de 18 años. Esta base contiene 172.538 observaciones con variables de distintos tipos: numéricas, factores y caracteres. Incluye identificadores como directorio, secuencia_p y orden, sin valores faltantes ni categorías especiales.
-
-En cuanto a hábitos de consumo, la variable consume_azucar no presenta NA, mientras que frecuencia_azucar tiene 63.494 valores faltantes correspondientes a aquellas personas que respondieron de forma negativa en la pregunta de consumo de azucar. Las variables de salud, que constituyen la variable dependiente del análisis, como cronica_12m y cronica_binaria, no presentan NA, aunque cronica_num registra 27.297 outliers. Entre las variables sociodemográficas, que se utilizarán como controles, sexo y parentesco no tienen NA; edad contiene 56 categorías especiales y 25 outliers; nivel_educativo presenta 9.781 NA; ingreso_pc tiene 14.907 outliers, y cod_depto cuenta con 3.905 categorías especiales.
-
-Revisión de outliers y valores faltantes: Se identificaron outliers en Fex e ingreso_pc. Fex se mantuvo sin cambios por ser la variable de expansión, mientras que los valores extremos de ingreso_pc tampoco se corrigieron, ya que el valor máximo (250 millones) se considera válido. Respecto a los valores faltantes, los NA en nivel_educativo corresponden principalmente a menores de 5 años y se mantuvieron. Los NA en ingreso_pc se imputaron utilizando la mediana por municipio.
-
+De la base df_final se obtiene la base df_analisis, filtrada para adultos mayores de 18 años. Esta base contiene 172.538 observaciones, con 20 variables de distintos tipos: numéricas, factores y caracteres. Incluye identificadores como directorio, secuencia_p y orden.
 ```{r}
 #//////// Se revisa la base 
+df_analisis %>% 
+  summarise(across(
+    everything(),
+    ~ tibble(
+        tipo_variable = class(.),
+        observaciones = sum(!is.na(.))
+      ),
+    .names = "{.col}"
+  )) %>% 
+  pivot_longer(everything(), names_to = "variable") %>%
+  unnest(cols = value)
 
-# 1. Detectar categorías especiales
-
-categorias_especiales <- c(
-  "No sabe", "No responde", "Ns/Nr",
-  "ns", "nr", "sin dato", "no aplica",
-  98, 99, 999, 9999
-)
-
-# 2. Función auxiliar para detectar outliers (método IQR)
-detectar_outliers <- function(x) {
-  if (!is.numeric(x)) return(NA_integer_)
-  q1 <- quantile(x, 0.25, na.rm = TRUE)
-  q3 <- quantile(x, 0.75, na.rm = TRUE)
-  iqr <- q3 - q1
-  sum(x < (q1 - 1.5*iqr) | x > (q3 + 1.5*iqr), na.rm = TRUE)
-}
-
-# 3. Tabla resumen completa
-tabla_resumen <- df_analisis %>%
-  summarise(
-    variable = names(.),
-    tipo = map_chr(., ~ class(.x)[1]),
-    n_observaciones = map_int(., length),
-    n_na = map_int(., ~ sum(is.na(.x))),
-    categorias_especiales = map_int(., ~ sum(.x %in% categorias_especiales)),
-    mezcla_ns_nr = map_lgl(., ~ any(.x %in% categorias_especiales) & !all(.x %in% categorias_especiales)),
-    outliers = map_int(., detectar_outliers)
-  ) %>%
-  unnest(cols = c(tipo, n_observaciones, n_na, categorias_especiales, mezcla_ns_nr, outliers))
-
-tabla_resumen
 ```
 
 ```{r}
