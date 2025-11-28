@@ -24,7 +24,7 @@ El repositorio se organiza bajo la siguiente estructura, reflejando el flujo de 
 | Archivo / Carpeta | Tipo de Componente | Descripción Funcional |
 | :--- | :--- | :--- |
 | `Trabajo final.RMD` | **Código Fuente** (R Markdown) | Contiene la totalidad del código R utilizado para la limpieza, el procesamiento, el análisis exploratorio (EDA) y la generación de los resultados intermedios. |
-| `[nombre_archivo].pbix` | **Modelo de Datos y Visualización** (Power BI) | Archivo principal que alberga el Modelo de Datos relacional construido. |
+| `[Mode de datos BI].pbix` | **Modelo de Datos y Visualización** (Power BI) | Archivo principal que alberga el Modelo de Datos relacional construido. |
 | `data/` | **Datos Intermedios** | Almacena los conjuntos de datos finales y depurados(exportados desde el RMD). Estos archivos están preparados para ser importados directamente a la herramienta de modelación. |
 | `Graficos - tablas/` | **Evidencia Descriptiva** | Contiene los archivos de gráficos y tablas estáticas generados durante la fase del Análisis Exploratorio de Datos (EDA). |
 | `Documentos/` | **Poryecto 2** | Contiene el informe final en formato Word, el cual incluye la revisión bibliográfica, la metodología, la discusión de resultados y las conclusiones del estudio. |
