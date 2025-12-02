@@ -1114,7 +1114,7 @@ ggsave("Graficos-tablas/univariado_edad.png",
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
 
-#### 2.3.1) Preparación de variables - bivariado
+#### Preparación de variables - bivariado
 
 Ajustando el dataset df_bivariado, corrigiendo los NAs de educación, ordenando los factores de consumo (para que el gráfico tenga sentido de menor a mayor) y creando una variable de edad categórica.
 
@@ -1130,44 +1130,60 @@ df_bivariado <- df_analisis %>%
                                    "Ocasional (< 2/sem)", 
                                    "Frecuente (2-6/sem)", 
                                    "Diario (Todos los días)"),
+    # Creación de grupos etarios
+    grupo_edad = case_when(
+      edad < 30 ~ "Jóvenes (18-29)",
+      edad >= 30 & edad < 40 ~ "Adultos Jóvenes (30-39)",
+      edad >= 40 & edad < 50 ~ "Adultez Media (40-49)",
+      edad >= 50 & edad < 60 ~ "Madurez (50-59)",
+      edad >= 60 & edad < 70 ~ "Adulto mayor (60-69)",
+      edad >= 70 ~ "Vejez extrema (70+)"
+    ),
+    # Ordenamos los niveles para los gráficops
+    grupo_edad = factor(grupo_edad, levels = c("Jóvenes (18-29)", 
+                                               "Adultos Jóvenes (30-39)", 
+                                               "Adultez Media (40-49)", 
+                                               "Madurez (50-59)", 
+                                               "Adulto mayor (60-69)", 
+                                               "Vejez extrema (70+)"))
   )
 
 ```
 
-#### 2.3.2) Tablas de prevalencias
+#### Tablas de prevalencias
 
 Generando las tablas resumen numéricas que alimentarán los gráficos.
 
 ```{r}
-# A) Tabla global
+# A) Tabla Global
 df_grafico_global <- df_bivariado %>%
   group_by(consumo_agrupado) %>%
   summarise(
     poblacion_total = sum(fex, na.rm = TRUE),
-    poblacion_enferma = sum(fex[cronica_12m == "Sí"], na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
     prevalencia = poblacion_enferma / poblacion_total,
     preva_100 = (poblacion_enferma / poblacion_total) * 100,
     pob_total_mill = round(poblacion_total / 1000000, 2),
     .groups = "drop"
   )
 
-# B) Tabla estratificada por edad
+# B) Tabla Estratificada por Edad
 df_grafico_estratificado <- df_bivariado %>%
   group_by(grupo_edad, consumo_agrupado) %>%
   summarise(
     poblacion_total = sum(fex, na.rm = TRUE),
-    poblacion_enferma = sum(fex[cronica_12m == "Sí"], na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
     prevalencia = poblacion_enferma / poblacion_total,
     preva_100 = (poblacion_enferma / poblacion_total) * 100,
     .groups = "drop"
   )
 
-# C) Tabla estratificada por sexo y edad (para heatmap y líneas)
+# C) Tabla Estratificada por Sexo y Edad (Para Heatmap y Líneas)
 df_grafico_sexo <- df_bivariado %>%
   group_by(sexo, grupo_edad, consumo_agrupado) %>%
   summarise(
     poblacion_total = sum(fex, na.rm = TRUE),
-    poblacion_enferma = sum(fex[cronica_12m == "Sí"], na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_binaria == "Sí"], na.rm = TRUE),
     prevalencia = poblacion_enferma / poblacion_total,
     preva_100 = (poblacion_enferma / poblacion_total) * 100,
     .groups = "drop"
@@ -1196,7 +1212,7 @@ exportar_html(df_grafico_estratificado, "Prevalencia por Edad", "Bivariado_preva
 exportar_html(df_grafico_sexo, "Prevalencia por Sexo y Edad", "Bivariado_prevalencia_edad_sexo")
 ```
 
-#### 2.3.3) Visualizaciones del bivariado
+#### Visualizaciones del bivariado
 
 ```{r}
 # ==============================================================================
@@ -1299,7 +1315,7 @@ p_lineas_sexo <- ggplot(df_grafico_sexo,
     strip.text = element_text(face = "bold")
   )
 
-# Guardar gráficos
+# Guardar Gráficos
 ggsave("Graficos-tablas/bivariado_graph_global.png", p_global, width = 8, height = 6)
 ggsave("Graficos-tablas/bivariado_graph_edad.png", p_estratificado, width = 10, height = 6)
 ggsave("Graficos-tablas/bivariado_heatmap_graph_edad_sexo.png", p_heatmap_sexo, width = 12, height = 7)
@@ -1320,7 +1336,7 @@ Dinámica de género y sesgo de supervivencia diferencial: El análisis de las t
 
 Conclusión del análisis descriptivo: en síntesis, la evidencia descriptiva bivariada sugiere que sí existe una asociación positiva estructural entre la intensidad del consumo y la enfermedad crónica, pero esta relación es condicional a la edad y al sexo. De esta manera, el análisis bivariado puede ser insuficiente debido a la contaminación por causalidad reversa y sesgos de selección y supervivencia. Por consiguiente, es importasnte usar modelos multivariados que aíslen el riesgo biológico real, controlando por la confusión demográfica y ajustando la categoría de referencia para mitigar el sesgo de endogeneidad introducido por el cambio de comportamiento post-diagnóstico.
 
-#### 2.3.4) Prueba estadística bivariada
+#### Prueba estadística bivariada
 
 Usamos el paquete survey para poder montar la prueba de hipótesis usando el factor de expansión de la ECV.
 
@@ -1333,31 +1349,20 @@ diseno_muestral <- svydesign(ids = ~1, weights = ~fex, data = df_bivariado)
 
 # Tabla cruzada ponderada 
 print("--- Tabla de Contingencia Poblacional (Millones de personas) ---")
-svytable(~consumo_agrupado + cronica_12m, design = diseno_muestral)
+svytable(~consumo_agrupado + cronica_binaria, design = diseno_muestral)
 
 # Test de Chi-Cuadrado de Rao-Scott (Corrección para encuestas complejas)
-test_survey <- svychisq(~consumo_agrupado + cronica_12m, design = diseno_muestral)
+test_survey <- svychisq(~consumo_agrupado + cronica_binaria, design = diseno_muestral)
 
 print("--- Resultado Chi-Cuadrado Ajustado (Rao-Scott) ---")
 print(test_survey)
 ```
 
-#### 2.3.5) Multivariado
+#### Multivariado
 
 ```{r}
 library(survey)
 library(broom)
-
-# Recodificando 
-df_bivariado <- df_bivariado %>%
-  mutate(
-    cronica_num = case_when(
-      cronica_12m %in% c("Sí") ~ 1,
-      cronica_12m %in% c("No") ~ 0,
-      is.na(cronica_12m) ~ NA_real_,
-      TRUE ~ NA_real_ 
-    )
-  )
 
 # Configuración de Referencias:
 # Referencia: Frecuente (Control) | Jóvenes | Hombres
@@ -1368,17 +1373,17 @@ df_model <- df_bivariado %>%
     sexo = relevel(sexo, ref = "Hombre")
   )
 
-# Diseño muestral
+# Diseño Muestral
 diseno_muestral <- svydesign(ids = ~1, weights = ~fex, data = df_model)
 
-# Ajuste del Modelo (Interacción triple)
+# Ajuste del Modelo (Interacción Triple)
 modelo_interaccion <- svyglm(
   cronica_num ~ consumo_agrupado * grupo_edad * sexo, 
   design = diseno_muestral,
   family = quasibinomial()
 )
 
-# Tabla de resultados tidy
+# Tabla de Resultados Tidy
 tabla_resultados <- tidy(modelo_interaccion, exponentiate = TRUE, conf.int = TRUE) %>%
   select(term, estimate, conf.low, conf.high, p.value) %>%
   mutate(
@@ -1394,14 +1399,14 @@ tabla_resultados <- tidy(modelo_interaccion, exponentiate = TRUE, conf.int = TRU
 
 Al establecer el 'Consumo Frecuente' como categoría basal —un grupo teóricamente expuesto pero sin el comportamiento extremo de restricción médica—, el modelo multivariado desveló dos mecanismos opuestos que operan simultáneamente en la población. Por un lado, se aisló el Efecto Biológico: la intensificación del hábito hacia un consumo 'Diario' incrementa significativamente la probabilidad de enfermedad crónica (OR = 1.61), confirmando la hipótesis de riesgo por exceso de exposición. Por otro lado, se dimensionó la magnitud de la Causalidad Inversa (Efecto Sick-Quitter): paradójicamente, la reducción del consumo a niveles 'Ocasionales' (OR = 2.25) o la abstinencia total (OR = 3.44) se asocian con los mayores niveles de riesgo. Este gradiente inverso no indica que dejar el azúcar enferme, sino que la enfermedad fuerza a los pacientes a migrar hacia categorías de bajo consumo, concentrando artificialmente la patología en los grupos de menor exposición aparente. El modelo confirma así que la relación no es lineal, sino en forma de 'J', donde tanto el exceso (por causa) como la carencia (por consecuencia) marcan los puntos altos de prevalencia.
 
-#### 2.3.6) Forest plot de la regresión
+#### Forest plot de la regresión
 
 ```{r}
 # Preparación de datos para el Forest Plot
 # Clasificamos los coeficientes según el mecanismo económico/epidemiológico
 df_forest_conceptual <- tabla_resultados %>%
   filter(term == "Mujer" | grepl("Consumo", term)) %>%
-  filter(!grepl("Edad", term)) %>% 
+  filter(!grepl("Edad", term)) %>% # Filtramos interacciones de edad para limpieza visual
   mutate(
     Mecanismo = case_when(
       grepl("Diario", term) & !grepl("Mujer", term) ~ "1. Efecto tratamiento (margen intensivo)",
@@ -1521,6 +1526,7 @@ dim_demografia <- df_modelo %>%
     parentesco,
     nivel_educativo,
     # Incluimos las variables de desenlace en versión texto para filtros
+    cronica_binaria,   # "Sí"/"No"
     cronica_12m        # "1"/"2"
   )
 
