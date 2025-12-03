@@ -172,11 +172,14 @@ vivienda <- read_dta(file.path(ruta, "Datos de la vivienda.dta"))
 #//////// Mantener solo las variables de interés 
 
 # 1. Base de Salud (Nivel Persona)
-df_salud <- salud %>%
+df_salud_ampliado <- salud %>%
   select(DIRECTORIO, SECUENCIA_P, ORDEN,
          P1707,       # Consumo bebidas azucaradas
          P1707S1,     # Frecuencia consumo
-         P1930)       # Diagnóstico enfermedad crónica
+         P1930,       # Diagnóstico enfermedad crónica
+         P6127,       # Estado de salud general
+         P3003S1     # Frecuencia de consumo alimentos de paquete
+     )
 
 # 2. Base de Características del Hogar (Nivel Persona)
 df_caracteristicas <- caracteristicas %>%
@@ -209,7 +212,7 @@ df_vivienda <- vivienda %>%
 #//////// Se verifican los duplicados
 
 # 1. SALUD
-n_dupli_salud <- df_salud %>% 
+n_dupli_salud_ampliado <- df_salud_ampliado %>% 
   group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
   filter(n() > 1) %>% 
   nrow()
@@ -261,7 +264,7 @@ print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
 
 ```{r}
 #//////// Se unen las 5 bases
-df_final_c <- df_salud %>%
+df_final_c <- df_salud_ampliado %>%
   # Join 1: Nivel Persona con Persona (uno a uno)
   left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
   
@@ -298,7 +301,11 @@ df_final <- df_final %>%
     # P1707S1: Frecuencia de consumo
     frecuencia_azucar = P1707S1,
     
-    # --- Variables de Control (Sociodemográficas) ---
+    # --- Variables de Control (Sociodemográficas y confusoras) ---
+    #P6127: Estado general de salud
+    estado_salud = P6127,
+    #P3003S1: Frecuencia de consumo alimentos de paquete 
+    frecuencia_paquetes = P3003S1,
     # P6020: Sexo
     sexo = P6020,
     # P6040: Edad
@@ -327,7 +334,7 @@ Se realiza una revisión de la codificación usando la documentación de la ECV 
 
 ***¿Sus variables numéricas son realmente numéricas?***
 
-VARIABLES NUMERICAS: Las variables que son verdaderamente numéricas teniendo en cuenta las definiciones de la ECV-2023 son:
+VARIABLES NUMÉRICAS: Las variables que son verdaderamente numéricas teniendo en cuenta las definiciones de la ECV-2023 son:
 
 -   Edad
 
@@ -349,10 +356,10 @@ class(df_final$ingreso_pc)
 class(df_final$fex)
 ```
 
-VARIABLES CATEGÓRICAS: - Directorio - Secuencia_p - orden - Sexo - Parentesco - Nivel educativo más alto alcanzado - ordinal - Diagnóstico de enfermedad crónica - Consumo de bebidas azucaradas - Frecuencia de consumo de bebidas azucaradas - ordinales - Departamento - Municipio.
+VARIABLES CATEGÓRICAS: - Directorio - Secuencia_p - orden - Sexo - Parentesco - Nivel educativo más alto alcanzado - ordinal - Diagnóstico de enfermedad crónica - Consumo de bebidas azucaradas - Frecuencia de consumo de bebidas azucaradas - Estado general de salud - Frecuencia de consumo paquetes - ordinales - Departamento - Municipio.
 
 ```{r}
-# //////// Redefinimos las variables que son categóricas por su naturaleza según la ECV
+# //// Redefinimos las variables que son categóricas por su naturaleza según la ECV
 df_final <- df_final %>%
   mutate(
     
@@ -364,15 +371,17 @@ df_final <- df_final %>%
     cod_depto         = as.character(cod_depto),
     
     # se asignan como factores
-    sexo              = factor(sexo),
-    parentesco        = factor(parentesco),
-    nivel_educativo   = factor(nivel_educativo),
-    cronica_12m       = factor(cronica_12m),
-    consume_azucar    = factor(consume_azucar),
-    frecuencia_azucar = factor(frecuencia_azucar)
-
-    
+    sexo                = factor(sexo),
+    parentesco          = factor(parentesco),
+    nivel_educativo     = factor(nivel_educativo),
+    cronica_12m         = factor(cronica_12m),
+    consume_azucar      = factor(consume_azucar),
+    frecuencia_azucar   = factor(frecuencia_azucar),
+    frecuencia_paquetes = factor(frecuencia_paquetes),
+    estado_salud        = factor(estado_salud)
   )
+
+
 summary(df_final)
 ```
 
@@ -421,7 +430,27 @@ df_final <- df_final %>%
                                         "Técnico sin título", "Técnico con título", 
                                         "Tecnológico sin título", "Tecnológico con título", 
                                         "Universitario sin titulo", "Universitario con titulo", 
-                                        "Postgrado sin titulo", "Postgrado con titulo"))
+                                        "Postgrado sin titulo", "Postgrado con titulo")),
+    
+    #Frecuencia consumo de paquetes(P3003S1)
+    frecuencia_paquetes = factor(frecuencia_paquetes,
+                                 levels = 1:7,
+                                 labels = c("Todos los días (≥2 veces/día)",
+                                            "Todos los días (1 vez/día)",
+                                            "4 a 6 veces por semana",
+                                            "2 a 3 veces por semana",
+                                            "Una vez a la semana",
+                                            "Menos de una vez por semana",
+                                            "No responde/NA"),
+                                 exclude = NULL),
+    #Estado de salud percibido
+    estado_salud = factor(estado_salud,
+                          levels = 1:4,
+                          labels = c("Muy bueno",
+                                     "Bueno",
+                                     "Regular",
+                                     "Malo"))
+    
   )
 
 skimr::skim(df_final)
@@ -430,7 +459,7 @@ skimr::skim(df_final)
 
 ***¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?***
 
-No existen por construcción de las preguntas y documentación de la ECV-DANE-2023
+No existen por construcción de las preguntas y documentación de la ECV-DANE-2023. Sin embargo, se construye un valor artificial de No Responde/NA para los datos faltantes en la variable de *frecuencia_paquetes* con el objetivo de capturar el sesgo de información.
 
 ***¿Cómo se comporta el factor de expansión?***
 
@@ -679,6 +708,45 @@ df_analisis <- df_analisis %>%
     sexo = if_else(sexo == 1, "Hombre", "Mujer"),
     sexo = factor(sexo, levels = c("Hombre", "Mujer"))
   )
+
+#Recodificando la variable frecuencia de consumo de paquetes 
+
+df_analisis <- df_analisis %>%
+  mutate(
+    freq_paquetes_num = case_when(
+      is.na(frecuencia_paquetes) ~ 7, 
+      TRUE ~ as.numeric(frecuencia_paquetes) 
+    ),
+    
+    # Variable Agrupada 
+    consumo_paquetes_agrupado_txt = case_when(
+      freq_paquetes_num == 7 ~ "No Responde/Missing",
+      freq_paquetes_num == 6 ~ "Ocasional (< 1/sem)", 
+      freq_paquetes_num %in% c(4, 5) ~ "Semanal (1-3/sem)", 
+      freq_paquetes_num == 3 ~ "Frecuente (4-6/sem)", 
+      freq_paquetes_num %in% c(1, 2) ~ "Diario (Todos los días)" 
+    ),
+    
+    # Consumo Agrupado (Factor Ordenado)
+    consumo_paquetes_agrupado = factor(consumo_paquetes_agrupado_txt, 
+                                       levels = c("Ocasional (< 1/sem)", 
+                                                  "Semanal (1-3/sem)",
+                                                  "Frecuente (4-6/sem)",
+                                                  "Diario (Todos los días)",
+                                                  "No Responde/Missing")), 
+    
+    # Consumo Detallado (Factor Ordenado)
+    consumo_paquetes_detallado = factor(freq_paquetes_num,
+                                        levels = c(6, 5, 4, 3, 2, 1, 7), 
+                                        labels = c("Menos de 1 vez/sem",
+                                                   "1 vez/sem",
+                                                   "2-3 veces/sem",
+                                                   "4-6 veces/sem",
+                                                   "Diario (1 vez)",
+                                                   "Diario (2+ veces)",
+                                                   "No Responde/NA"))
+  )
+
 
 skim(df_analisis)
 
