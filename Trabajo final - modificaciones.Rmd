@@ -1730,205 +1730,170 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 ## 2.4) Modelamiento de datos relacionales
 
 ```{r}
-# Cargar listado DANE 
+library(dplyr)
+library(readxl)
+library(stringr)
+library(writexl)
+
+# ============================================================================
+# 1. CARGAR LISTADO DANE Y NORMALIZAR CÓDIGOS
+# ============================================================================
+
 dane_mpios <- read_excel("data/Listado_Departamentos.xlsx") %>%
   rename(
-    cod_depto      = `Código Departamento`,
-    cod_mpio       = `Código Municipio`,
-    nombre_depto   = `Nombre Departamento`,
-    nombre_mpio    = `Nombre Municipio`
+    cod_depto = `Código Departamento`,
+    cod_mpio_full = `Código Municipio`,
+    nombre_depto = `Nombre Departamento`,
+    nombre_mpio  = `Nombre Municipio`
   ) %>%
   mutate(
-    # Es vital asegurar que los códigos sean texto para que el join funcione bien
-    cod_depto = as.character(cod_depto),
-    cod_mpio  = as.character(cod_mpio)
-  )
+    cod_depto = str_pad(as.character(cod_depto), 2, pad = "0"),
+    cod_mpio_full = str_pad(as.character(cod_mpio_full), 5, pad = "0"),
+    cod_mpio = str_sub(cod_mpio_full, 3, 5)
+  ) %>%
+  select(cod_depto, cod_mpio, nombre_depto, nombre_mpio) %>%
+  distinct()
 
-# =============================================================================
-# 3. Preparación general: IDs y llaves
-# =============================================================================
+# ============================================================================
+# 2. PREPARAR DATAFRAME BASE PARA EL MODELO
+# ============================================================================
+
 df_modelo <- df_bivariado %>%
   mutate(
-    # --- IMPORTANTE: Convertir identificadores de negocio a TEXTO puro ---
-    # Esto asegura que salgan como "01", "101", etc., y no como números sumables
     directorio_char  = as.character(directorio),
     secuencia_p_char = as.character(secuencia_p),
     orden_char       = as.character(orden),
 
-    # Creación de llaves técnicas (Concatenadas para el sistema)
+    cod_depto = str_pad(as.character(cod_depto), 2, pad = "0"),
+    cod_mpio  = str_pad(as.character(cod_mpio),  3, pad = "0"),
+
     id_hogar   = paste0(directorio, "-", secuencia_p),
     id_persona = paste0(directorio, "-", secuencia_p, "-", orden),
-    
-    # Asegurar tipos de dato para cruce geográfico
-    cod_mpio   = as.character(cod_mpio),
-    cod_depto  = as.character(cod_depto),
-    
-    # Llave compuesta para geografía (Depto + Mpio)
+
     id_geografia = paste0(cod_depto, cod_mpio)
   )
 
-# =============================================================================
-# 4. DIMENSIONES (Corrección Observación 3: Normalización y separación)
-# =============================================================================
 
-# ---- Dimensión Geografía -----------------------------------------------------
+# ============================================================================
+# 3. DIMENSIÓN GEOGRAFÍA
+# ============================================================================
+
 dim_geografia <- df_modelo %>%
   select(id_geografia, cod_depto, cod_mpio) %>%
   distinct() %>%
   left_join(dane_mpios, by = c("cod_depto", "cod_mpio")) %>%
-  select(
-    id_geografia,
-    cod_depto, nombre_depto,
-    cod_mpio, nombre_mpio
-  )
+  select(id_geografia, cod_depto, nombre_depto, cod_mpio, nombre_mpio)
 
-# ---- Dimensión Hogar ---------------------------------------------------------
-# Observación 1: Mantenemos el hogar como dimensión.
-# AJUSTE: Ponemos Directorio y Secuencia PRIMERO para fácil lectura
-dim_hogar <- df_modelo %>%
+
+# ============================================================================
+# 4. DIMENSIONES DEMOGRÁFICAS Y DE ATRIBUTOS
+# ============================================================================
+
+dim_sexo <- df_modelo %>%
+  select(sexo) %>% distinct() %>% mutate(id_sexo = row_number())
+
+dim_etario <- df_modelo %>%
+  select(grupo_edad) %>% distinct() %>% mutate(id_etario = row_number())
+
+dim_parentesco <- df_modelo %>%
+  select(parentesco) %>% distinct() %>% mutate(id_parentesco = row_number())
+
+dim_educacion <- df_modelo %>%
+  select(nivel_educativo) %>% distinct() %>% mutate(id_educacion = row_number())
+
+dim_estado_salud <- df_modelo %>%
+  select(estado_salud) %>% distinct() %>% mutate(id_estado_salud = row_number())
+
+dim_cronica <- df_modelo %>%
+  select(cronica_12m) %>% distinct() %>% mutate(id_cronica = row_number())
+
+dim_paquetes <- df_modelo %>%
+  select(frecuencia_paquetes) %>% distinct() %>% mutate(id_paquetes = row_number())
+
+dim_consumo <- df_modelo %>%
   select(
-    directorio = directorio_char,   # Renombramos para exportar limpio
-    secuencia_p = secuencia_p_char, 
-    id_hogar, 
-    id_geografia, 
-    ingreso_pc
+    consume_azucar, frecuencia_azucar, freq_num,
+    consumo_agrupado, consumo_agrupado_txt, consumo_detallado
+  ) %>%
+  distinct() %>%
+  mutate(id_consumo = row_number())
+
+
+# ============================================================================
+# 5. TABLA DE HECHO HOGAR (como en el modelo estrella del ejemplo)
+# ============================================================================
+
+fact_hogar <- df_modelo %>%
+  select(
+    id_hogar,
+    id_geografia,
+    directorio = directorio_char,
+    secuencia_p = secuencia_p_char,
+    ingreso_pc,
+    fex_hogar = fex,       # si tu variable se llama diferente, cámbiala
   ) %>%
   distinct()
 
-# ---- Dimensión Sexo ----------------------------------------------------------
-dim_sexo <- df_modelo %>%
-  select(sexo) %>%
-  distinct() %>%
-  mutate(id_sexo = row_number()) %>%
-  relocate(id_sexo)
 
-# ---- Dimensión Grupo Etario --------------------------------------------------
-dim_etario <- df_modelo %>%
-  select(grupo_edad) %>%
-  distinct() %>%
-  arrange(grupo_edad) %>%
-  mutate(id_etario = row_number()) %>%
-  relocate(id_etario)
-
-# ---- Dimensión Parentesco ----------------------------------------------------
-dim_parentesco <- df_modelo %>%
-  select(parentesco) %>%
-  distinct() %>%
-  arrange(parentesco) %>%
-  mutate(id_parentesco = row_number()) %>%
-  relocate(id_parentesco)
-
-# ---- Dimensión Nivel Educativo -----------------------------------------------
-dim_educacion <- df_modelo %>%
-  select(nivel_educativo) %>%
-  distinct() %>%
-  arrange(nivel_educativo) %>%
-  mutate(id_educacion = row_number()) %>%
-  relocate(id_educacion)
-
-# ---- Dimensión Estado de Salud (Percepción) ----------------------------------
-dim_estado_salud <- df_modelo %>%
-  select(estado_salud) %>%
-  distinct() %>%
-  arrange(estado_salud) %>%
-  mutate(id_estado_salud = row_number()) %>%
-  relocate(id_estado_salud)
-
-# ---- Dimensión Enfermedad Crónica (Diagnóstico) ------------------------------
-dim_cronica <- df_modelo %>%
-  select(cronica_12m) %>%
-  distinct() %>%
-  arrange(cronica_12m) %>%
-  mutate(id_cronica = row_number()) %>%
-  relocate(id_cronica)
-
-# ---- Dimensión Frecuencia de Paquetes ----------------------------------------
-dim_paquetes <- df_modelo %>%
-  select(frecuencia_paquetes) %>%
-  distinct() %>%
-  mutate(id_paquetes = row_number()) %>%
-  relocate(id_paquetes)
-
-# ---- Dimensión Consumo (Bebidas azucaradas) ----------------------------------
-dim_consumo <- df_modelo %>%
-  select(
-    consume_azucar,
-    frecuencia_azucar,
-    freq_num,
-    consumo_agrupado,
-    consumo_agrupado_txt,
-    consumo_detallado
-  ) %>%
-  distinct() %>%
-  arrange(consumo_detallado) %>%
-  mutate(id_consumo = row_number()) %>%
-  relocate(id_consumo)
-
-# =============================================================================
-# 5. TABLA DE HECHOS (FACT TABLE)
-# =============================================================================
+# ============================================================================
+# 6. TABLA DE HECHO PERSONAS
+# ============================================================================
 
 fact_personas <- df_modelo %>%
-  # Joins para obtener los IDs numéricos (Surrogate Keys)
-  left_join(dim_sexo,         by = "sexo") %>%
-  left_join(dim_etario,       by = "grupo_edad") %>%
-  left_join(dim_parentesco,   by = "parentesco") %>%
-  left_join(dim_educacion,    by = "nivel_educativo") %>%
-  left_join(dim_estado_salud, by = "estado_salud") %>%
-  left_join(dim_cronica,      by = "cronica_12m") %>%
-  left_join(dim_paquetes,     by = "frecuencia_paquetes") %>%
-  left_join(dim_consumo,
-            by = c("consume_azucar","frecuencia_azucar","freq_num",
-                   "consumo_agrupado","consumo_agrupado_txt","consumo_detallado")) %>%
+  left_join(dim_sexo, "sexo") %>%
+  left_join(dim_etario, "grupo_edad") %>%
+  left_join(dim_parentesco, "parentesco") %>%
+  left_join(dim_educacion, "nivel_educativo") %>%
+  left_join(dim_estado_salud, "estado_salud") %>%
+  left_join(dim_cronica, "cronica_12m") %>%
+  left_join(dim_paquetes, "frecuencia_paquetes") %>%
+  left_join(
+    dim_consumo,
+    by = c("consume_azucar","frecuencia_azucar","freq_num",
+           "consumo_agrupado","consumo_agrupado_txt","consumo_detallado")
+  ) %>%
   select(
-    # --- IDENTIFICACIÓN CLARA (Tus Observaciones) ---
-    # Estas son las columnas originales para que sepas quién es "Hogar 1, Persona 1"
-    directorio  = directorio_char,
-    secuencia_p = secuencia_p_char,
-    orden       = orden_char,
-
-    # --- Llaves Técnicas (necesarias para relacionar en BI, pero secundarias visualmente) ---
     id_persona,
     id_hogar,
-    
-    # --- IDs de las Variables (Dimensiones) ---
-    # Nota: Estos números conectan con las tablas Dimensión.
-    # Por ejemplo, si id_sexo es 1, vas a Dim_Sexo y ves que 1 = Hombre.
+    id_geografia,
+
     id_sexo,
     id_etario,
     id_parentesco,
     id_educacion,
-    id_estado_salud, 
-    id_cronica,      
+    id_estado_salud,
+    id_cronica,
     id_paquetes,
     id_consumo,
-    
-    # --- Métricas ---
-    fex,             
-    edad,            
-    cronica_num,     
-    freq_num         
+
+    edad,
+    fex_persona = fex,
+    cronica_num,
+    freq_num
   )
 
-# =============================================================================
-# 6. Exportar modelo completo
-# =============================================================================
+
+# ============================================================================
+# 7. EXPORTAR TODO EL MODELO NORMALIZADO
+# ============================================================================
 
 lista_tablas_final <- list(
-  "Hechos_Personas"     = fact_personas,
-  "Dim_Hogar"           = dim_hogar,
-  "Dim_Geografia"       = dim_geografia,
-  "Dim_Sexo"            = dim_sexo,
-  "Dim_Etario"          = dim_etario,
-  "Dim_Parentesco"      = dim_parentesco,
-  "Dim_Educacion"       = dim_educacion,
-  "Dim_Estado_Salud"    = dim_estado_salud,
-  "Dim_Cond_Cronica"    = dim_cronica,
-  "Dim_Paquetes"        = dim_paquetes,
-  "Dim_Consumo"         = dim_consumo
+  "Hechos_Hogar"      = fact_hogar,
+  "Hechos_Personas"   = fact_personas,
+  "Dim_Geografia"     = dim_geografia,
+  "Dim_Sexo"          = dim_sexo,
+  "Dim_Etario"        = dim_etario,
+  "Dim_Parentesco"    = dim_parentesco,
+  "Dim_Educacion"     = dim_educacion,
+  "Dim_Estado_Salud"  = dim_estado_salud,
+  "Dim_Cond_Cronica"  = dim_cronica,
+  "Dim_Paquetes"      = dim_paquetes,
+  "Dim_Consumo"       = dim_consumo
 )
 
 write_xlsx(lista_tablas_final, "data/Modelo_Datos_Normalizado.xlsx")
+
+
 
 ```
 
