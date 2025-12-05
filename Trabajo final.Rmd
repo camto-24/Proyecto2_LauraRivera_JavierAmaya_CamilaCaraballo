@@ -129,16 +129,6 @@ Además, al contar con información territorial por departamento y municipio, es
 
 # Parte 2: EDA y modelamiento de datos
 
-• USAR PALETA DE COLORES BLUE-TEAL DEL PAQUETE PALETEER:
-
--   <https://r-charts.com/es/paletas-colores/>
-
--   <https://coolors.co/palettes/trending>
-
--   <https://color.adobe.com/es/>
-
-• USAR EL TEMA ggthemr(“fresh”) del paquete library(ggthemr) disponible para consulta en la pagina: <https://r-charts.com/es/ggplot2/temas/>
-
 ### 2.1) Preparación y comprensión inicial de los datos
 
 #### 2.1.1) Carga de los datos y verificación de estructuras básicas
@@ -172,11 +162,14 @@ vivienda <- read_dta(file.path(ruta, "Datos de la vivienda.dta"))
 #//////// Mantener solo las variables de interés 
 
 # 1. Base de Salud (Nivel Persona)
-df_salud <- salud %>%
+df_salud_ampliado <- salud %>%
   select(DIRECTORIO, SECUENCIA_P, ORDEN,
          P1707,       # Consumo bebidas azucaradas
          P1707S1,     # Frecuencia consumo
-         P1930)       # Diagnóstico enfermedad crónica
+         P1930,       # Diagnóstico enfermedad crónica
+         P6127,       # Estado de salud general
+         P3003S1     # Frecuencia de consumo alimentos de paquete
+     )
 
 # 2. Base de Características del Hogar (Nivel Persona)
 df_caracteristicas <- caracteristicas %>%
@@ -209,11 +202,11 @@ df_vivienda <- vivienda %>%
 #//////// Se verifican los duplicados
 
 # 1. SALUD
-n_dupli_salud <- df_salud %>% 
+n_dupli_salud_ampliado <- df_salud_ampliado %>% 
   group_by(DIRECTORIO, SECUENCIA_P, ORDEN) %>% 
   filter(n() > 1) %>% 
   nrow()
-print(paste("Duplicados en Salud:", n_dupli_salud))
+print(paste("Duplicados en Salud:", n_dupli_salud_ampliado))
 
 # 2. CARACTERÍSTICAS
 n_dupli_caract <- df_caracteristicas %>% 
@@ -261,7 +254,7 @@ print(paste("Duplicados en Vivienda:", n_dupli_vivienda))
 
 ```{r}
 #//////// Se unen las 5 bases
-df_final_c <- df_salud %>%
+df_final_c <- df_salud_ampliado %>%
   # Join 1: Nivel Persona con Persona (uno a uno)
   left_join(df_caracteristicas, by = c("DIRECTORIO", "SECUENCIA_P", "ORDEN")) %>%
   
@@ -298,7 +291,11 @@ df_final <- df_final %>%
     # P1707S1: Frecuencia de consumo
     frecuencia_azucar = P1707S1,
     
-    # --- Variables de Control (Sociodemográficas) ---
+    # --- Variables de Control (Sociodemográficas y confusoras) ---
+    #P6127: Estado general de salud
+    estado_salud = P6127,
+    #P3003S1: Frecuencia de consumo alimentos de paquete 
+    frecuencia_paquetes = P3003S1,
     # P6020: Sexo
     sexo = P6020,
     # P6040: Edad
@@ -327,32 +324,42 @@ Se realiza una revisión de la codificación usando la documentación de la ECV 
 
 ***¿Sus variables numéricas son realmente numéricas?***
 
-VARIABLES NUMERICAS: Las variables que son verdaderamente numéricas teniendo en cuenta las definiciones de la ECV-2023 son:
+VARIABLES NUMÉRICAS: Las variables que son verdaderamente numéricas teniendo en cuenta las definiciones de la ECV-2023 son:
 
 -   Edad
 
 -   Ingreso per capita
 
+-   Estado salud (variable nueva agregada)
+
+-   Frecuencia paquete (variable nueva agregada)
+
 ```{r}
 summary(df_final$edad)
 summary(df_final$ingreso_pc)
 summary(df_final$fex)
+summary(df_final$estado_salud)
+summary(df_final$frecuencia_paquetes)
+
 ```
 
 ```{r}
 hist(df_final$edad)
 hist(log(df_final$ingreso_pc))
 hist(log(df_final$fex))
-
+hist(log(df_final$frecuencia_paquetes))
+hist(log(df_final$estado_salud))
 class(df_final$edad)
 class(df_final$ingreso_pc)
 class(df_final$fex)
+class(df_final$frecuencia_paquetes)
+class(df_final$estado_salud)
 ```
 
-VARIABLES CATEGÓRICAS: - Directorio - Secuencia_p - orden - Sexo - Parentesco - Nivel educativo más alto alcanzado - ordinal - Diagnóstico de enfermedad crónica - Consumo de bebidas azucaradas - Frecuencia de consumo de bebidas azucaradas - ordinales - Departamento - Municipio.
+VARIABLES CATEGÓRICAS: - Directorio - Secuencia_p - orden - Sexo - Parentesco - Nivel educativo más alto alcanzado - ordinal - Diagnóstico de enfermedad crónica - Consumo de bebidas azucaradas - Frecuencia de consumo de bebidas azucaradas - Estado general de salud - Frecuencia de consumo paquetes - ordinales - Departamento - Municipio.
 
 ```{r}
-# //////// Redefinimos las variables que son categóricas por su naturaleza según la ECV
+# //// Redefinimos las variables que son categóricas por su naturaleza según la ECV
 df_final <- df_final %>%
   mutate(
     
@@ -364,16 +371,19 @@ df_final <- df_final %>%
     cod_depto         = as.character(cod_depto),
     
     # se asignan como factores
-    sexo              = factor(sexo),
-    parentesco        = factor(parentesco),
-    nivel_educativo   = factor(nivel_educativo),
-    cronica_12m       = factor(cronica_12m),
-    consume_azucar    = factor(consume_azucar),
-    frecuencia_azucar = factor(frecuencia_azucar)
-
-    
+    sexo                = factor(sexo),
+    parentesco          = factor(parentesco),
+    nivel_educativo     = factor(nivel_educativo),
+    cronica_12m         = factor(cronica_12m),
+    consume_azucar      = factor(consume_azucar),
+    frecuencia_azucar   = factor(frecuencia_azucar),
+    frecuencia_paquetes = factor(frecuencia_paquetes),
+    estado_salud        = factor(estado_salud)
   )
+
+
 summary(df_final)
+
 ```
 
 **¿Las categorías están completas y correctamente etiquetadas?** **¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?**
@@ -421,7 +431,30 @@ df_final <- df_final %>%
                                         "Técnico sin título", "Técnico con título", 
                                         "Tecnológico sin título", "Tecnológico con título", 
                                         "Universitario sin titulo", "Universitario con titulo", 
-                                        "Postgrado sin titulo", "Postgrado con titulo"))
+                                        "Postgrado sin titulo", "Postgrado con titulo")),
+    
+  # 1. Reemplazar NA reales por categoría 7
+    frecuencia_paquetes = ifelse(is.na(frecuencia_paquetes), 7, frecuencia_paquetes),
+
+    # 2. Convertir a factor con etiquetas
+    frecuencia_paquetes = factor(frecuencia_paquetes,
+                                 levels = 1:7,
+                                 labels = c("Todos los días (≥2 veces/día)",
+                                            "Todos los días (1 vez/día)",
+                                            "4 a 6 veces por semana",
+                                            "2 a 3 veces por semana",
+                                            "Una vez a la semana",
+                                            "Menos de una vez por semana",
+                                            "No responde/NA"),
+                                 exclude = NULL),
+    #Estado de salud percibido
+    estado_salud = factor(estado_salud,
+                          levels = 1:4,
+                          labels = c("Muy bueno",
+                                     "Bueno",
+                                     "Regular",
+                                     "Malo"))
+    
   )
 
 skimr::skim(df_final)
@@ -430,7 +463,7 @@ skimr::skim(df_final)
 
 ***¿Hay valores como “No sabe/No responde” mezclados con categorías válidas?***
 
-No existen por construcción de las preguntas y documentación de la ECV-DANE-2023
+No existen por construcción de las preguntas y documentación de la ECV-DANE-2023. Sin embargo, se construye un valor artificial de No Responde/NA para los datos faltantes en la variable de *frecuencia_paquetes* con el objetivo de capturar el sesgo de información.
 
 ***¿Cómo se comporta el factor de expansión?***
 
@@ -484,12 +517,24 @@ En esta etapa de la limpieza observamos NAs en las variables del consumo de azuc
 Revisión de NAs: Se revisaron los NA en nivel_educativo, que corresponden principalmente a menores de 5 años, y se mantuvieron sin cambios junto con las variables de consume_azucar y frecuencia_azucar.
 
 ```{r}
+# Se revisa si las variables nuevas agregadas tienen NA
+sum(is.na(df_final$estado_salud)) 
+sum(is.na(df_final$frecuencia_paquetes)) 
+
+# Creamos un subconjunto solo con NAs con frecuencia paquetes
+df_paquetes_na <- df_final %>%
+  filter(is.na(frecuencia_paquetes))
+
+# Se revisa el nivel educativo 
 skimr::skim(df_final$nivel_educativo)
+
 # Creamos un subconjunto solo con NAs en nivel educativo
 df_educacion_na <- df_final %>%
   filter(is.na(nivel_educativo))
+
 # Verificamos la edad promedio
 summary(df_educacion_na$edad)
+
 # distribución según las diferentes edades
 table(df_educacion_na$edad)
 ```
@@ -679,6 +724,45 @@ df_analisis <- df_analisis %>%
     sexo = if_else(sexo == 1, "Hombre", "Mujer"),
     sexo = factor(sexo, levels = c("Hombre", "Mujer"))
   )
+
+#Recodificando la variable frecuencia de consumo de paquetes 
+
+df_analisis <- df_analisis %>%
+  mutate(
+    freq_paquetes_num = case_when(
+      is.na(frecuencia_paquetes) ~ 7, 
+      TRUE ~ as.numeric(frecuencia_paquetes) 
+    ),
+    
+    # Variable Agrupada 
+    consumo_paquetes_agrupado_txt = case_when(
+      freq_paquetes_num == 7 ~ "No Responde/Missing",
+      freq_paquetes_num == 6 ~ "Ocasional (< 1/sem)", 
+      freq_paquetes_num %in% c(4, 5) ~ "Semanal (1-3/sem)", 
+      freq_paquetes_num == 3 ~ "Frecuente (4-6/sem)", 
+      freq_paquetes_num %in% c(1, 2) ~ "Diario (Todos los días)" 
+    ),
+    
+    # Consumo Agrupado (Factor Ordenado)
+    consumo_paquetes_agrupado = factor(consumo_paquetes_agrupado_txt, 
+                                       levels = c("Ocasional (< 1/sem)", 
+                                                  "Semanal (1-3/sem)",
+                                                  "Frecuente (4-6/sem)",
+                                                  "Diario (Todos los días)",
+                                                  "No Responde/Missing")), 
+    
+    # Consumo Detallado (Factor Ordenado)
+    consumo_paquetes_detallado = factor(freq_paquetes_num,
+                                        levels = c(6, 5, 4, 3, 2, 1, 7), 
+                                        labels = c("Menos de 1 vez/sem",
+                                                   "1 vez/sem",
+                                                   "2-3 veces/sem",
+                                                   "4-6 veces/sem",
+                                                   "Diario (1 vez)",
+                                                   "Diario (2+ veces)",
+                                                   "No Responde/NA"))
+  )
+
 
 skim(df_analisis)
 
@@ -1114,6 +1198,179 @@ ggsave("Graficos-tablas/univariado_edad.png",
 
 ```
 
+#### 2.2.6) Estado de salud general
+```{r}
+# Cálculo NO Ponderado (Muestra real)
+tabla_no_pond_es <- df_analisis %>%
+  count(estado_salud) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
+
+# Cálculo Ponderado (Estimación poblacional)
+tabla_pond_es <- df_analisis %>%
+  group_by(estado_salud) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
+
+# Unir tablas
+tabla_final_es <- tabla_no_pond_es %>%
+  left_join(tabla_pond_es, by = "estado_salud")
+
+print(head(tabla_final_es))
+
+# Preparar datos para gráfico
+datos_grafico_es <- tabla_final_es %>%
+  select(estado_salud, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
+
+# Paleta TEAL
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+# Gráfico comparativo
+univariado_estado_salud <- ggplot(datos_grafico_es,
+                                  aes(x = estado_salud,
+                                      y = proporcion,
+                                      fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "Distribución del estado de salud autopercibido",
+    x = "Estado de salud",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray")
+  ) +
+  
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    hjust = -0.2,
+    size = 3.5
+  ) +
+  
+  coord_flip()
+
+print(univariado_estado_salud)
+
+# Guardar gráfico
+ggsave("Graficos-tablas/univariado_estado_salud.png",
+       univariado_estado_salud,
+       width = 8,
+       height = 6)
+
+```
+
+#### 2.2.7) Frecuencia de consumo alimentos de paquete
+```{r}
+# Cálculo NO Ponderado (Muestra real)
+tabla_no_pond_fp <- df_analisis %>%
+  count(frecuencia_paquetes) %>%
+  mutate(prop_no_pond = n / sum(n)) %>%
+  rename(freq_no_pond = n)
+
+# Cálculo Ponderado (Estimación poblacional)
+tabla_pond_fp <- df_analisis %>%
+  group_by(frecuencia_paquetes) %>%
+  summarise(freq_pond = sum(fex, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(prop_pond = freq_pond / sum(freq_pond))
+
+# Unir tablas
+tabla_final_fp <- tabla_no_pond_fp %>%
+  left_join(tabla_pond_fp, by = "frecuencia_paquetes")
+
+print(head(tabla_final_fp))
+
+# Preparar datos para gráfico
+datos_grafico_fp <- tabla_final_fp %>%
+  select(frecuencia_paquetes, prop_no_pond, prop_pond) %>%
+  pivot_longer(
+    cols = c(prop_no_pond, prop_pond),
+    names_to = "tipo_medida",
+    values_to = "proporcion"
+  ) %>%
+  mutate(
+    tipo_medida = case_when(
+      tipo_medida == "prop_no_pond" ~ "Muestra (No Ponderado)",
+      tipo_medida == "prop_pond" ~ "Población (Ponderado)"
+    )
+  )
+
+# Paleta de colores TEAL
+paleta_teal <- c("#E0F7FA", "#80DEEA", "#26C6DA", "#0097A7", "#006064")
+
+# Gráfico comparativo
+univariado_paquetes <- ggplot(datos_grafico_fp,
+                              aes(x = frecuencia_paquetes,
+                                  y = proporcion,
+                                  fill = tipo_medida)) +
+  geom_col(position = "dodge", width = 0.7) +
+  
+  scale_fill_manual(values = c(paleta_teal[3], paleta_teal[5])) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  labs(
+    title = "Comparación: Muestra vs. Población Estimada",
+    subtitle = "Distribución de frecuencia de paquetes",
+    x = "Categoría de frecuencia",
+    y = "Porcentaje (%)",
+    fill = "Tipo de Medida",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    axis.text = element_text(color = "black", size = 11),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "gray")
+  ) +
+  
+  geom_text(
+    aes(label = scales::percent(proporcion, accuracy = 0.1)),
+    position = position_dodge(width = 0.7),
+    hjust = -0.2,  
+    size = 3.5
+  ) +
+  
+  coord_flip()   
+
+print(univariado_paquetes)
+
+# Guardar gráfico
+ggsave("Graficos-tablas/univariado_frecuencia_paquetes.png",
+       univariado_paquetes,
+       width = 8,
+       height = 6)
+```
+
+
+
 ### 2.3) Análisis bivariado guiado por la pregunta
 
 Una vez comprendidas las variables, realice comparaciones que respondan directamente a la pregunta de indagación. El objetivo es producir evidencia gráfica relevante para sustentar una respuesta. Puede tomar como referencia las sugerencias de visualización del enunciado de la Actividad 2, según corresponda. Incluya los gráficos que considere pertinentes y que ilustren la relaciones entre variables de la pregunta de indagación en el informe. Acompáñelos de un análisis interpretativo.
@@ -1178,6 +1435,30 @@ df_grafico_sexo <- df_bivariado %>%
   ) %>%
   mutate(grupo_edad_rev = fct_rev(grupo_edad)) 
 
+# D) Por Estado de Salud (Validación de coherencia interna)
+df_grafico_salud <- df_bivariado %>%
+  group_by(estado_salud) %>%
+  summarise(
+    poblacion_total = sum(fex, na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_12m == "Sí"], na.rm = TRUE),
+    prevalencia = poblacion_enferma / poblacion_total,
+    preva_100 = (poblacion_enferma / poblacion_total) * 100,
+    .groups = "drop"
+  )
+
+# E) Por Consumo de Paquetes (Factor de riesgo concurrente)
+df_grafico_paquetes <- df_bivariado %>%
+  # Excluimos la categoría de missing para el gráfico bivariado
+  filter(consumo_paquetes_agrupado != "No Responde/Missing") %>% 
+  group_by(consumo_paquetes_agrupado) %>%
+  summarise(
+    poblacion_total = sum(fex, na.rm = TRUE),
+    poblacion_enferma = sum(fex[cronica_12m == "Sí"], na.rm = TRUE),
+    prevalencia = poblacion_enferma / poblacion_total,
+    preva_100 = (poblacion_enferma / poblacion_total) * 100,
+    .groups = "drop"
+  )
+
 ```
 
 Ahora exportamos las tablas al formato seleccionado:
@@ -1195,9 +1476,11 @@ exportar_html <- function(data, titulo, nombre_archivo) {
 }
 
 # Generar las 3 tablas clave
-exportar_html(df_grafico_global, "Prevalencia Global Ponderada", "Bivariado_prevalencia_global")
-exportar_html(df_grafico_estratificado, "Prevalencia por Edad", "Bivariado_prevalencia_edad")
-exportar_html(df_grafico_sexo, "Prevalencia por Sexo y Edad", "Bivariado_prevalencia_edad_sexo")
+exportar_html(df_grafico_global, "Prevalencia Global Ponderada", "Bivariado_prevalencia_global_TABLA")
+exportar_html(df_grafico_estratificado, "Prevalencia por Edad", "Bivariado_prevalencia_edad_TABLA")
+exportar_html(df_grafico_sexo, "Prevalencia por Sexo y Edad", "Bivariado_prevalencia_edad_sexo_TABLA")
+exportar_html(df_grafico_salud, "Prevalencia por Estado de Salud", "Bivariado_prevalencia_salud_TABLA")
+exportar_html(df_grafico_paquetes, "Prevalencia por Consumo de Paquetes", "Bivariado_prevalencia_paquetes_TABLA")
 ```
 
 #### 2.3.3) Visualizaciones del bivariado
@@ -1303,17 +1586,62 @@ p_lineas_sexo <- ggplot(df_grafico_sexo,
     strip.text = element_text(face = "bold")
   )
 
+# --- GRÁFICO 5: TENDENCIAS POR ESTADO DE SALUD ---
+p_salud <- ggplot(df_grafico_salud, aes(x = estado_salud, y = prevalencia, fill = estado_salud)) +
+  geom_col(width = 0.7, alpha = 0.9) +
+  geom_text(aes(label = paste0(round(preva_100, 1), "%")), 
+            vjust = -0.5, size = 4, fontface = "bold", color = "#2c3e50") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 0.80)) + # Ajuste límite
+  scale_fill_manual(values = c("#26C6DA", "#0097A7", "#006064", "#2c3e50")) + # Gradiente Teal a Oscuro
+  labs(
+    title = "Gradiente de enfermedad crónica según autopercepción de salud",
+    subtitle = "Validación de constructo: a peor estado percibido, mayor prevalencia objetiva",
+    x = "Estado de salud percibido", 
+    y = "Prevalencia de enfermedad crónica (%)",
+    caption = "Fuente: ECV 2023. Población expandida."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "none",
+    axis.text.x = element_text(size = 11, face = "bold"),
+    panel.grid.major.x = element_blank()
+  )
+
+# --- GRÁFICO 6: TENDENCIAS POR CONSUMO DE PAQUETES ---
+p_paquetes <- ggplot(df_grafico_paquetes, aes(x = consumo_paquetes_agrupado, y = prevalencia)) +
+  geom_segment(aes(x = consumo_paquetes_agrupado, xend = consumo_paquetes_agrupado, 
+                   y = 0, yend = prevalencia), color = "grey70", size = 1) +
+  geom_point(size = 6, color = "#FF7F0E") + # Usamos naranja para contrastar con bebidas (Teal)
+  geom_text(aes(label = paste0(round(preva_100, 1), "%")), 
+            vjust = -1.8, size = 3.5, fontface = "bold", color = "#2c3e50") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 0.25)) +
+  labs(
+    title = "Prevalencia de enf. crónica según consumo de paquetes",
+    x = NULL, 
+    y = "Prevalencia (%)"
+  ) +
+  theme_few() +
+  theme(
+    axis.text.x = element_text(angle = 15, hjust = 1)
+  )
+
+
 # Guardar gráficos
 ggsave("Graficos-tablas/bivariado_graph_global.png", p_global, width = 8, height = 6)
 ggsave("Graficos-tablas/bivariado_graph_edad.png", p_estratificado, width = 10, height = 6)
 ggsave("Graficos-tablas/bivariado_heatmap_graph_edad_sexo.png", p_heatmap_sexo, width = 12, height = 7)
 ggsave("Graficos-tablas/bivaariado_lineas_sexo_edad.png", p_lineas_sexo, width = 12, height = 6)
+ggsave("Graficos-tablas/bivaariado_salud_enfermedad.png", p_salud, width = 12, height = 6)
+ggsave("Graficos-tablas/bivaariado_paquetes_enfermedad.png", p_paquetes, width = 12, height = 6)
 
 # Mostrar en RMarkdown
 print(p_global)
 print(p_estratificado)
 print(p_heatmap_sexo)
 print(p_lineas_sexo)
+print(p_salud)
+print(p_paquetes)
 ```
 
 Análisis global (paradoja de la causalidad reversa): al examinar la relación cruda entre el consumo de bebidas azucaradas y la enfermedad crónica a nivel nacional, se observa una asociación negativa aparente: la prevalencia de enfermedad es drásticamente mayor en el grupo que "No consume" (24.0%) comparado con quienes consumen "Diariamente" (8.6%). Desde una perspectiva epidemiológica y económica, este hallazgo no sugiere un efecto protector del azúcar, sino que evidencia un fuerte sesgo de selección por causalidad inversa (fenómeno sick-quitter). Es altamente probable que el diagnóstico de patologías como diabetes o hipertensión actúe como el determinante exógeno que fuerza a los individuos a modificar su dieta, concentrando así a la población con peor salud en la categoría de "No consumidores" y distorsionando la estimación del riesgo real.
@@ -1323,6 +1651,8 @@ Estratificación por grupo etario (heterogeneidad del efecto): Al controlar por 
 Dinámica de género y sesgo de supervivencia diferencial: El análisis de las trayectorias vitales añade una capa de complejidad mediante la brecha de género. Aunque en etapas tempranas (18-29 años) las curvas de prevalencia se solapan, con la edad se produce una separación progresiva donde las mujeres reportan tasas sistemáticamente más altas, atribuible a una mayor frecuencia de diagnóstico y uso de servicios de salud frente al sub-registro masculino. Críticamente, al llegar a la tercera edad, se evidencia una atrición diferencial: mientras las mujeres mantienen el patrón de riesgo en "J" hasta la vejez extrema, los hombres pierden dicha señal a partir de los 60 años. Esto sugiere que los hombres con alto consumo y predisposición a enfermar sufren una mortalidad prematura selectiva, dejando en la muestra de ancianos a un subgrupo de "sobrevivientes resilientes" que sesgan la asociación hacia la nulidad, fenómeno menos acentuado en mujeres debido a su mayor esperanza de vida con morbilidad.
 
 Conclusión del análisis descriptivo: en síntesis, la evidencia descriptiva bivariada sugiere que sí existe una asociación positiva estructural entre la intensidad del consumo y la enfermedad crónica, pero esta relación es condicional a la edad y al sexo. De esta manera, el análisis bivariado puede ser insuficiente debido a la contaminación por causalidad reversa y sesgos de selección y supervivencia. Por consiguiente, es importasnte usar modelos multivariados que aíslen el riesgo biológico real, controlando por la confusión demográfica y ajustando la categoría de referencia para mitigar el sesgo de endogeneidad introducido por el cambio de comportamiento post-diagnóstico.
+
+En cuanto al analisis bivariado de percepción de salud y prevalencia de enfermedad crónica se puede observar que a mayor autopercepción de mala salud, aumenta la prevalencia de enfermedad crónica. Este hallazgo valida la idea de que la coherencia y consistencia de la variable que estamos usando como dependiente. Por otro lado, también se puede observar una relación de causalidad reversa en la prevalencia de enfermedad crónica vs consumo de paquetes, este hallazgo refuerza la hipótesis de que el diagnóstico médico cambia el comportamiento de las personas enfermas y no permite ver claramente el efecto real del consumo de este tipo de alimentos sobre la salud en este tipo de encuestas.  
 
 #### 2.3.4) Prueba estadística bivariada
 
@@ -1473,91 +1803,171 @@ La gráfica presenta los *Odds Ratios* estimados mediante un modelo Logit con pe
 ## 2.4) Modelamiento de datos relacionales
 
 ```{r}
-# Preparación de llaves y IDs
+library(dplyr)
+library(readxl)
+library(stringr)
+library(writexl)
+
+# ============================================================================
+# 1. CARGAR LISTADO DANE Y NORMALIZAR CÓDIGOS
+# ============================================================================
+
+dane_mpios <- read_excel("data/Listado_Departamentos.xlsx") %>%
+  rename(
+    cod_depto = `Código Departamento`,
+    cod_mpio_full = `Código Municipio`,
+    nombre_depto = `Nombre Departamento`,
+    nombre_mpio  = `Nombre Municipio`
+  ) %>%
+  mutate(
+    cod_depto = str_pad(as.character(cod_depto), 2, pad = "0"),
+    cod_mpio_full = str_pad(as.character(cod_mpio_full), 5, pad = "0"),
+    cod_mpio = str_sub(cod_mpio_full, 3, 5)
+  ) %>%
+  select(cod_depto, cod_mpio, nombre_depto, nombre_mpio) %>%
+  distinct()
+
+# ============================================================================
+# 2. PREPARAR DATAFRAME BASE PARA EL MODELO
+# ============================================================================
+
 df_modelo <- df_bivariado %>%
   mutate(
-    # Llaves Únicas
+    directorio_char  = as.character(directorio),
+    secuencia_p_char = as.character(secuencia_p),
+    orden_char       = as.character(orden),
+
+    cod_depto = str_pad(as.character(cod_depto), 2, pad = "0"),
+    cod_mpio  = str_pad(as.character(cod_mpio),  3, pad = "0"),
+
     id_hogar   = paste0(directorio, "-", secuencia_p),
     id_persona = paste0(directorio, "-", secuencia_p, "-", orden),
-    
-    # Asegurar formato carácter para cruces
-    cod_mpio  = as.character(cod_mpio),
-    cod_depto = as.character(cod_depto),
-    id_geografia = paste0(cod_depto, cod_mpio),
+
+    id_geografia = paste0(cod_depto, cod_mpio)
   )
 
-# Dimensión geográfica
+
+# ============================================================================
+# 3. DIMENSIÓN GEOGRAFÍA
+# ============================================================================
+
 dim_geografia <- df_modelo %>%
   select(id_geografia, cod_depto, cod_mpio) %>%
-  distinct() %>% 
-  group_by(id_geografia) %>%
-  slice(1) %>%
-  ungroup()
+  distinct() %>%
+  left_join(dane_mpios, by = c("cod_depto", "cod_mpio")) %>%
+  select(id_geografia, cod_depto, nombre_depto, cod_mpio, nombre_mpio)
 
-# Dimensión hogar (Economía y Entorno)
-# Aquí va el ingreso_pc porque es dato de hogar
-dim_hogar <- df_modelo %>%
-  select(id_hogar, id_geografia, ingreso_pc) %>% 
-  group_by(id_hogar) %>%
-  slice(1) %>%
-  ungroup()
 
-# Dimensión del consumo de bebidas azucaradas (variable de exposición en el analisis)
+# ============================================================================
+# 4. DIMENSIONES DEMOGRÁFICAS Y DE ATRIBUTOS
+# ============================================================================
+
+dim_sexo <- df_modelo %>%
+  select(sexo) %>% distinct() %>% mutate(id_sexo = row_number())
+
+dim_etario <- df_modelo %>%
+  select(grupo_edad) %>% distinct() %>% mutate(id_etario = row_number())
+
+dim_parentesco <- df_modelo %>%
+  select(parentesco) %>% distinct() %>% mutate(id_parentesco = row_number())
+
+dim_educacion <- df_modelo %>%
+  select(nivel_educativo) %>% distinct() %>% mutate(id_educacion = row_number())
+
+dim_estado_salud <- df_modelo %>%
+  select(estado_salud) %>% distinct() %>% mutate(id_estado_salud = row_number())
+
+dim_cronica <- df_modelo %>%
+  select(cronica_12m) %>% distinct() %>% mutate(id_cronica = row_number())
+
+dim_paquetes <- df_modelo %>%
+  select(frecuencia_paquetes) %>% distinct() %>% mutate(id_paquetes = row_number())
+
 dim_consumo <- df_modelo %>%
   select(
-    consume_azucar,          # Si/No (Original)
-    frecuencia_azucar,       # 1-6 (Original)
-    freq_num,                # Numérico equivalente a si=1 y no=0
-    consumo_agrupado,        # Factor ordenado (Tu variable principal)
-    consumo_agrupado_txt,    # Texto
-    consumo_detallado        # Factor detallado
+    consume_azucar, frecuencia_azucar, freq_num,
+    consumo_agrupado, consumo_agrupado_txt, consumo_detallado
   ) %>%
   distinct() %>%
-  arrange(consumo_detallado) %>%
   mutate(id_consumo = row_number())
 
-# Dimensión demográfica
-dim_demografia <- df_modelo %>%
+
+# ============================================================================
+# 5. TABLA DE HECHOS HOGAR 
+# ============================================================================
+
+fact_hogar <- df_modelo %>%
+  select(
+    id_hogar,
+    id_geografia,
+    directorio = directorio_char,
+    secuencia_p = secuencia_p_char,
+    ingreso_pc,
+    fex_hogar = fex,       
+  ) %>%
+  distinct()
+
+
+# ============================================================================
+# TABLA DE HECHOS PERSONAS
+# ============================================================================
+
+fact_personas <- df_modelo %>%
+  left_join(dim_sexo, "sexo") %>%
+  left_join(dim_etario, "grupo_edad") %>%
+  left_join(dim_parentesco, "parentesco") %>%
+  left_join(dim_educacion, "nivel_educativo") %>%
+  left_join(dim_estado_salud, "estado_salud") %>%
+  left_join(dim_cronica, "cronica_12m") %>%
+  left_join(dim_paquetes, "frecuencia_paquetes") %>%
+  left_join(
+    dim_consumo,
+    by = c("consume_azucar","frecuencia_azucar","freq_num",
+           "consumo_agrupado","consumo_agrupado_txt","consumo_detallado")
+  ) %>%
   select(
     id_persona,
-    sexo,
-    grupo_edad,        
-    parentesco,
-    nivel_educativo,
-    # Incluimos las variables de desenlace en versión texto para filtros
-    cronica_12m        # "1"/"2"
-  )
+    id_hogar,
+    id_geografia,
 
-# Tabla de hechos
-fact_personas <- df_modelo %>%
-  # Traemos el id_consumo cruzando por TODAS las variables para ser precisos
-  left_join(dim_consumo, 
-            by = c("consume_azucar", "frecuencia_azucar", "freq_num", 
-                   "consumo_agrupado", "consumo_agrupado_txt", "consumo_detallado")) %>%
-  select(
-    # Llaves para relacionar (Foreign Keys)
-    id_persona,      # Relación 1:1 con Dim_Demografia
-    id_hogar,        # Relación N:1 con Dim_Hogar
-    id_consumo,      # Relación N:1 con Dim_Consumo
-    
-    # Variables Numéricas (Metrics)
-    fex,             # Factor de expansión 
-    edad,            # Edad exacta (para promedios)
-    cronica_num,     # 0/1 (Para calcular prevalencias)
-    freq_num         # Por si quieres calcular "Frecuencia promedio de consumo"
+    id_sexo,
+    id_etario,
+    id_parentesco,
+    id_educacion,
+    id_estado_salud,
+    id_cronica,
+    id_paquetes,
+    id_consumo,
+
+    edad,
+    fex_persona = fex,
+    cronica_num,
+    freq_num
   )
 
 
-# Exportando la tabla a excel para que la pueda tomar power BI
+# ============================================================================
+# EXPORTAR TODO EL MODELO NORMALIZADO
+# ============================================================================
+
 lista_tablas_final <- list(
-  "Hechos_Personas" = fact_personas,
-  "Dim_Hogar"       = dim_hogar,
-  "Dim_Demografia"  = dim_demografia,
-  "Dim_Geografia"   = dim_geografia,
-  "Dim_Consumo"     = dim_consumo
+  "Hechos_Hogar"      = fact_hogar,
+  "Hechos_Personas"   = fact_personas,
+  "Dim_Geografia"     = dim_geografia,
+  "Dim_Sexo"          = dim_sexo,
+  "Dim_Etario"        = dim_etario,
+  "Dim_Parentesco"    = dim_parentesco,
+  "Dim_Educacion"     = dim_educacion,
+  "Dim_Estado_Salud"  = dim_estado_salud,
+  "Dim_Cond_Cronica"  = dim_cronica,
+  "Dim_Paquetes"      = dim_paquetes,
+  "Dim_Consumo"       = dim_consumo
 )
 
-write_xlsx(lista_tablas_final, "Data/Modelo_Datos_Completo.xlsx")
+write_xlsx(lista_tablas_final, "data/Modelo_Datos_Normalizado.xlsx")
+
+
+
 ```
 
 # Parte 3: Desarrollo de una visualización sencilla para comunicar los resultados
